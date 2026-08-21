@@ -6,7 +6,7 @@ const SECRET_KEY = new TextEncoder().encode(
   process.env.AUTH_SECRET || 'chave_padrao_temporaria_32_caracteres_min'
 );
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Apenas rotas /admin que NÃO sejam /admin/login

@@ -1,11 +1,13 @@
 // src/app/admin/orcamento/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { RoomInput, RoomServiceItem } from "../../data/calculatorTypes";
+import { defaultPricingConfig } from "../../data/pricingConfig";
 import { generateProjectQuote } from "../../utils/quoteEngine";
 import { logoutAdmin } from "../../actions/authActions";
-import { LogOut } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
 import { Trash2, Plus, Calculator, FileText, CheckCircle2 } from "lucide-react";
 
 const MAX_DIMENSION_METERS = 100;
@@ -40,6 +42,32 @@ export default function AdminBudgetPage() {
 
   const [clientName, setClientName] = useState("");
   const [clientPhone, setClientPhone] = useState("");
+  const [pricingConfig, setPricingConfig] = useState(defaultPricingConfig);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("opontodogesso_pricing_config");
+
+    if (!saved) return;
+
+    try {
+      const parsedConfig = JSON.parse(saved);
+
+      setPricingConfig({
+        ...defaultPricingConfig,
+        ...parsedConfig,
+        laborRates: {
+          ...defaultPricingConfig.laborRates,
+          ...(parsedConfig?.laborRates ?? {}),
+        },
+        materialCosts: {
+          ...defaultPricingConfig.materialCosts,
+          ...(parsedConfig?.materialCosts ?? {}),
+        },
+      });
+    } catch (err) {
+      console.error("Erro ao ler preços personalizados:", err);
+    }
+  }, []);
 
   // Adicionar novo cômodo
   const handleAddRoom = () => {
@@ -148,7 +176,7 @@ export default function AdminBudgetPage() {
   };
 
   // Executar motor de cálculo
-  const quoteResult = generateProjectQuote(rooms);
+  const quoteResult = generateProjectQuote(rooms, pricingConfig);
 
   return (
     <div className="min-h-screen bg-neutral-100 text-neutral-900 p-4 sm:p-8">
@@ -156,16 +184,6 @@ export default function AdminBudgetPage() {
         {/* Topo do Painel */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl shadow-sm border border-neutral-200">
           <div>
-            <button
-              type="button"
-              onClick={async () => {
-                await logoutAdmin();
-                window.location.href = "/admin/login";
-              }}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-red-50 text-neutral-600 hover:text-red-600 text-xs font-bold transition-all border border-neutral-200"
-            >
-              <LogOut className="w-4 h-4" /> Sair
-            </button>
             <span className="text-xs font-bold uppercase tracking-wider text-brand-red">
               Painel Administrativo O Ponto do Gesso
             </span>
@@ -178,9 +196,23 @@ export default function AdminBudgetPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200">
-              <CheckCircle2 className="w-4 h-4" /> Motor Ativo
-            </span>
+            <Link
+              href="/admin/precos"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold transition-all border border-neutral-200"
+            >
+              <Settings className="w-4 h-4" /> Ajustar Preços
+            </Link>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await logoutAdmin();
+                window.location.href = "/admin/login";
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-red-50 text-neutral-600 hover:text-red-600 text-xs font-bold transition-all border border-neutral-200"
+            >
+              <LogOut className="w-4 h-4" /> Sair
+            </button>
           </div>
         </div>
 
