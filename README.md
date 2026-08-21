@@ -1,6 +1,6 @@
 # O Ponto do Gesso - Landing Page Institucional & Comercial
 
-Landing page moderna e de alta performance desenvolvida para **O Ponto do Gesso**, focada em captação de clientes para prestação de serviços (gesso, drywall, sancas) e venda direta de materiais para construção a pronta entrega.
+Landing page moderna e de alta performance desenvolvida para **O Ponto do Gesso**, focada em captação de clientes para prestação de serviços (gesso, sancas) e venda direta de materiais para construção a pronta entrega.
 
 ---
 

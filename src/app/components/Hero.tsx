@@ -4,7 +4,7 @@ import { companyData } from '../data/company';
 
 export function Hero() {
   const whatsappObraUrl = `https://wa.me/${companyData.whatsapp}?text=${encodeURIComponent(
-    'Olá! Gostaria de solicitar um orçamento para serviço de gesso/drywall.'
+    'Olá! Gostaria de solicitar um orçamento para serviço de gesso.'
   )}`;
 
   const whatsappMaterialUrl = `https://wa.me/${companyData.whatsapp}?text=${encodeURIComponent(
@@ -51,7 +51,7 @@ export function Hero() {
 
           {/* Título */}
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.15]">
-            Soluções completas em <span className="text-brand-red">gesso, drywall</span> e venda de materiais.
+            Soluções completas em <span className="text-brand-red">gesso</span> e venda de materiais.
           </h1>
 
           {/* Subtítulo */}

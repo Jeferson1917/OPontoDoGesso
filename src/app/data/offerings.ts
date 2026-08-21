@@ -17,12 +17,7 @@ export const services = [
     description: 'Sancas abertas, invertidas, ilhas centrais e rasgos de luz em LED com acabamento refinado para salas e quartos.',
     tag: 'Design & Acabamento',
   },
-  {
-    icon: Layers,
-    title: 'Drywall e Divisórias',
-    description: 'Instalação ágil e limpa de paredes em drywall, isolamento termoacústico e fechamento de ambientes.',
-    tag: 'Rápido & Limpo',
-  },
+
   {
     icon: Maximize2,
     title: 'Forros e Rebaixamento',
@@ -43,12 +38,6 @@ export const products = [
     icon: Package,
     items: ['Gesso Lento para Revestimento', 'Gesso Rápido', 'Gesso de Fundição'],
     description: 'Sacos com alta pureza e secagem controlada para acabamentos finos e peças.',
-  },
-  {
-    category: 'Chapas de Drywall',
-    icon: Boxes,
-    items: ['Chapa Standard (ST)', 'Chapa Resistente à Umidade (RU)', 'Chapa Perfurada Acústica'],
-    description: 'Chapas normatizadas para paredes, forros e áreas úmidas (banheiros e cozinhas).',
   },
   {
     category: 'Perfis e Estruturas Metálicas',

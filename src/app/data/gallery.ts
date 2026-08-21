@@ -7,12 +7,6 @@ export const galleryItems = [
     image: '/images/galeria-1.jpg',
   },
   {
-    title: 'Divisória e Forro Drywall',
-    category: 'Drywall Comercial',
-    description: 'Montagem rápida com isolamento acústico para escritório.',
-    image: '/images/galeria-2.jpg',
-  },
-  {
     title: 'Parede em Gesso 3D',
     category: 'Revestimento 3D',
     description: 'Efeito volumétrico elegante em painel de TV.',

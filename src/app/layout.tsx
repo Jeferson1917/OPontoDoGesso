@@ -6,12 +6,12 @@ import './globals.css';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'O Ponto do Gesso | Serviços de Gesso, Drywall e Venda de Materiais',
-  description: 'Especialistas em forros, sancas iluminadas, divisórias em drywall e venda completa de materiais e ferramentas para gesso.',
-  keywords: ['gesso', 'drywall', 'sancas', 'forro de gesso', 'materiais para gesso', 'reforma'],
+  title: 'O Ponto do Gesso | Serviços de Gesso e Venda de Materiais',
+  description: 'Especialistas em forros, sancas iluminadas e venda completa de materiais e ferramentas para gesso.',
+  keywords: ['gesso','sancas', 'forro de gesso', 'materiais para gesso', 'reforma'],
   openGraph: {
     title: 'O Ponto do Gesso | Serviços & Materiais',
-    description: 'Forros, sancas, drywall e venda direta de insumos a pronta entrega.',
+    description: 'Forros, sancas e venda direta de insumos a pronta entrega.',
     url: 'https://opontodogesso.com.br',
     siteName: 'O Ponto do Gesso',
     locale: 'pt_BR',
