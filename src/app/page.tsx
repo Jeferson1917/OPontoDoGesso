@@ -5,6 +5,8 @@ import { Services } from './components/Services';
 import { Products } from './components/Products';
 import { Gallery } from './components/Gallery';
 import { About } from './components/About';
+import { Contact } from './components/Contact';
+import { Footer } from './components/Footer';
 import { FloatingWhatsApp } from './components/FloatingWhatsApp';
 
 export default function Home() {
@@ -18,13 +20,10 @@ export default function Home() {
         <Products />
         <Gallery />
         <About />
-
-        {/* Última Seção: Contato & Rodapé */}
-        <section id="contato" className="py-24 px-4 max-w-7xl mx-auto w-full">
-          <p className="text-neutral-500 font-medium text-center">[Seção Contato: Endereço, mapa e horários]</p>
-        </section>
+        <Contact />
       </main>
 
+      <Footer />
       <FloatingWhatsApp />
     </div>
   );
