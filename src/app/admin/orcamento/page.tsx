@@ -7,6 +7,8 @@ import { RoomInput, RoomServiceItem } from "../../data/calculatorTypes";
 import { defaultPricingConfig } from "../../data/pricingConfig";
 import { generateProjectQuote } from "../../utils/quoteEngine";
 import { logoutAdmin } from "../../actions/authActions";
+import { generateQuotePDF } from "../../utils/pdfGenerator";
+import { Download } from "lucide-react";
 import { LogOut, Settings } from "lucide-react";
 import { Trash2, Plus, Calculator, FileText, CheckCircle2 } from "lucide-react";
 
@@ -526,6 +528,21 @@ export default function AdminBudgetPage() {
                 className="w-full bg-brand-red hover:bg-brand-red-dark text-white font-bold py-3.5 rounded-xl transition-all shadow-md text-center block"
               >
                 Enviar Orçamento via WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  generateQuotePDF({
+                    clientName,
+                    clientPhone,
+                    rooms,
+                    quote: quoteResult,
+                  });
+                }}
+                className="w-full mt-3 bg-white/10 hover:bg-white/20 text-white font-bold py-3 rounded-xl transition-all border border-white/20 text-center text-xs flex items-center justify-center gap-2"
+              >
+                <Download className="w-4 h-4 text-brand-red-light" /> Baixar
+                Proposta em PDF
               </button>
             </div>
           </div>
