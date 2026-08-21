@@ -5,11 +5,16 @@
   --foreground: #171717;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+@theme {
+  /* Tons de Vinho / Bordô da logo */
+  --color-brand-red: #7A1C24;
+  --color-brand-red-dark: #5B1218;
+  --color-brand-red-light: #96232D;
+
+  /* Tons de Grafite / Chumbo da logo */
+  --color-brand-charcoal: #3A3B3C;
+  --color-brand-charcoal-dark: #232425;
+  --color-brand-charcoal-light: #525456;
 }
 
 @media (prefers-color-scheme: dark) {
