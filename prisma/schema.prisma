@@ -1,0 +1,77 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// 1. Histórico de Orçamentos Comerciais
+model Quote {
+  id                  String       @id @default(cuid())
+  clientName          String
+  clientPhone         String?
+  totalAreaM2         Float
+  suggestedFinalPrice Float
+  status              QuoteStatus  @default(PENDENTE) // PENDENTE, APROVADO, EM_EXECUCAO, CONCLUIDO, CANCELADO
+  roomsData           Json         // Detalhamento dos cômodos, metragens e serviços
+  materialsSnapshot   Json         // Lista consolidada de materiais calculados
+  notes               String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@map("quotes")
+}
+
+enum QuoteStatus {
+  PENDENTE
+  APROVADO
+  EM_EXECUCAO
+  CONCLUIDO
+  CANCELADO
+}
+
+// 2. Estoque Central & Cargas de Caminhão
+model TruckDelivery {
+  id                 String   @id @default(cuid())
+  date               DateTime @default(now())
+  supplier           String   // Ex: Polo do Araripe / Gipsita
+  tonsGessoPo        Float    // Toneladas de pó
+  platesQuantity     Int      @default(0) // Placas 60x60
+  gessoCostTotal     Float    // Custo na fábrica
+  freightCost        Float    // Frete pago ao caminhão
+  unloadingLaborCost Float    // Chapa/descarga
+  realCostPerKg      Float    // Custo rateado por kg
+  notes              String?
+  createdAt          DateTime @default(now())
+
+  @@map("truck_deliveries")
+}
+
+// 3. Venda Direta no Balcão para Gesseiros Autônomos
+model CounterSale {
+  id              String   @id @default(cuid())
+  customerName    String?  // Nome do gesseiro ou cliente
+  itemKey         String   // gessoPoKg, placaGesso60x60, etc.
+  quantity        Float    // Quantidade vendida
+  unitPrice       Float    // Preço cobrado
+  totalValue      Float    // Total da venda
+  estimatedProfit Float    // Lucro líquido em cima do custo médio
+  createdAt       DateTime @default(now())
+
+  @@map("counter_sales")
+}
+
+// 4. Configuração Global de Preços & Coeficientes
+model PricingConfig {
+  id                     String   @id @default("global_config")
+  laborRates             Json     // Tabela de preços de mão de obra
+  materialCosts          Json     // Custo unitário de compra dos insumos
+  minimumProjectPrice    Float    @default(350.0)
+  profitMarginMultiplier Float    @default(1.35)
+  wasteFactor            Float    @default(1.10)
+  updatedAt              DateTime @updatedAt
+
+  @@map("pricing_configs")
+}

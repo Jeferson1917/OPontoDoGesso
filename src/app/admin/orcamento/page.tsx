@@ -10,7 +10,7 @@ import { logoutAdmin } from "../../actions/authActions";
 import { generateQuotePDF } from "../../utils/pdfGenerator";
 import { Download } from "lucide-react";
 import { LogOut, Settings } from "lucide-react";
-import { Trash2, Plus, Calculator, FileText, CheckCircle2 } from "lucide-react";
+import { Trash2, Package, Plus, Calculator, FileText, CheckCircle2 } from "lucide-react";
 
 const MAX_DIMENSION_METERS = 100;
 const MAX_LINEAR_METERS = 500;
@@ -204,7 +204,12 @@ export default function AdminBudgetPage() {
             >
               <Settings className="w-4 h-4" /> Ajustar Preços
             </Link>
-
+            <Link
+              href="/admin/estoque"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-700 text-xs font-bold transition-all border border-neutral-200"
+            >
+              <Package className="w-4 h-4" /> Estoque & Cargas
+            </Link>
             <button
               type="button"
               onClick={async () => {

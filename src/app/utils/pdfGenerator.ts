@@ -62,7 +62,7 @@ export function generateQuotePDF({
   doc.setTextColor(212, 212, 216);
   doc.text('Forros Tradicionais • Molduras • Sancas • Revestimento Liso', headerLeftOffset, 22);
 
-  // Badge de Proposta Técnica
+  // Badge de Proposta Técnica  
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
   doc.setTextColor(255, 255, 255);
