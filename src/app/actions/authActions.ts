@@ -1,6 +1,7 @@
 'use server';
 
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { SignJWT, jwtVerify } from 'jose';
 
 const SECRET_KEY = new TextEncoder().encode(
@@ -14,7 +15,7 @@ export async function loginAdmin(formData: FormData) {
   const validEmail = process.env.ADMIN_EMAIL;
   const validPassword = process.env.ADMIN_PASSWORD;
 
-  if (email !== validEmail || password !== validPassword) {
+  if (!validEmail || !validPassword || email !== validEmail || password !== validPassword) {
     return { error: 'E-mail ou senha inválidos.' };
   }
 
@@ -40,4 +41,5 @@ export async function loginAdmin(formData: FormData) {
 export async function logoutAdmin() {
   const cookieStore = await cookies();
   cookieStore.delete('admin_session');
+  redirect('/admin/login');
 }
