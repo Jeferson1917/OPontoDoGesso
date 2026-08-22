@@ -6,10 +6,7 @@ import {
   Package, 
   FileText, 
   Settings, 
-  TrendingUp, 
   AlertTriangle, 
-  CheckCircle2, 
-  Clock, 
   LogOut, 
   ArrowUpRight 
 } from 'lucide-react';
@@ -23,10 +20,16 @@ export default async function AdminDashboardPage() {
     prisma.counterSale.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),
   ]);
 
-  // Cálculos de Indicadores
-  const totalQuotesValue = quotes.reduce((acc, q) => acc + q.suggestedFinalPrice, 0);
-  const approvedQuotes = quotes.filter((q) => q.status === 'APROVADO' || q.status === 'EM_EXECUCAO' || q.status === 'CONCLUIDO');
-  const approvedRevenue = approvedQuotes.reduce((acc, q) => acc + q.suggestedFinalPrice, 0);
+  // Função utilitária para capturar o valor efetivo negociado de cada proposta
+  const getEffectivePrice = (q: any) =>
+    q.finalAgreedPrice && q.finalAgreedPrice > 0 ? q.finalAgreedPrice : q.suggestedFinalPrice;
+
+  // Cálculos de Indicadores Financeiros
+  const totalQuotesValue = quotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
+  const approvedQuotes = quotes.filter(
+    (q) => q.status === 'APROVADO' || q.status === 'EM_EXECUCAO' || q.status === 'CONCLUIDO'
+  );
+  const approvedRevenue = approvedQuotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
   
   const gessoItem = stockBalances.find((s) => s.itemKey === 'gessoPoKg');
   const tonsGesso = gessoItem ? (gessoItem.currentQuantity / 1000).toFixed(1) : '0';
@@ -172,7 +175,7 @@ export default async function AdminDashboardPage() {
                     <td className="py-3 font-bold text-brand-charcoal-dark">{q.clientName}</td>
                     <td className="py-3 text-neutral-600 font-medium">{q.totalAreaM2.toFixed(2)} m²</td>
                     <td className="py-3 font-bold text-brand-red">
-                      {q.suggestedFinalPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      {getEffectivePrice(q).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </td>
                     <td className="py-3 text-right">
                       <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-neutral-100 text-neutral-700">

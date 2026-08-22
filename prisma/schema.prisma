@@ -14,8 +14,9 @@ model Quote {
   clientPhone         String?
   totalAreaM2         Float
   suggestedFinalPrice Float        // Valor paramétrico de tabela
-  finalAgreedPrice    Float        @default(0.0) // <-- Adicionado @default(0.0)
+  finalAgreedPrice    Float        @default(0.0) 
   discountApplied     Float        @default(0.0)
+  stockDeducted       Boolean      @default(false)
   status              QuoteStatus  @default(PENDENTE)
   roomsData           Json         
   materialsSnapshot   Json         

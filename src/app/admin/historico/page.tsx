@@ -39,14 +39,23 @@ export default function AdminQuotesHistoryPage() {
   }, []);
 
   const handleStatusChange = async (id: string, newStatus: QuoteStatus) => {
+    const toastId = toast.loading('Atualizando status e estoque...');
     const res = await updateQuoteStatusAction(id, newStatus);
+
     if (res.success) {
-      toast.success(`Status atualizado para ${newStatus}!`);
+      if (res.deducted) {
+        toast.success(`Status alterado para ${newStatus} e materiais baixados do estoque!`, { id: toastId });
+      } else if (res.refunded) {
+        toast.success(`Obra cancelada. Materiais devolvidos ao estoque com sucesso!`, { id: toastId });
+      } else {
+        toast.success(`Status atualizado para ${newStatus}!`, { id: toastId });
+      }
+
       setQuotes((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, status: newStatus } : q)),
+        prev.map((q) => (q.id === id ? { ...q, status: newStatus } : q))
       );
     } else {
-      toast.error("Falha ao atualizar status.");
+      toast.error(res.error || 'Falha ao atualizar status.', { id: toastId });
     }
   };
 
@@ -129,81 +138,96 @@ export default function AdminQuotesHistoryPage() {
                     <th className="p-4">Data</th>
                     <th className="p-4">Cliente</th>
                     <th className="p-4">Metragem</th>
-                    <th className="p-4">Valor Total</th>
+                    <th className="p-4">Valor Acordado</th>
                     <th className="p-4">Status da Proposta</th>
                     <th className="p-4 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {quotes.map((quote) => (
-                    <tr
-                      key={quote.id}
-                      className="hover:bg-neutral-50/60 transition-colors"
-                    >
-                      <td className="p-4 font-medium text-neutral-500">
-                        {new Date(quote.createdAt).toLocaleDateString("pt-BR")}
-                      </td>
-                      <td className="p-4">
-                        <span className="font-bold text-brand-charcoal-dark block">
-                          {quote.clientName}
-                        </span>
-                        {quote.clientPhone && (
-                          <span className="text-neutral-400 text-[11px]">
-                            {quote.clientPhone}
+                  {quotes.map((quote) => {
+                    const effectivePrice = (quote.finalAgreedPrice && quote.finalAgreedPrice > 0)
+                      ? quote.finalAgreedPrice
+                      : quote.suggestedFinalPrice;
+
+                    return (
+                      <tr
+                        key={quote.id}
+                        className="hover:bg-neutral-50/60 transition-colors"
+                      >
+                        <td className="p-4 font-medium text-neutral-500">
+                          {new Date(quote.createdAt).toLocaleDateString("pt-BR")}
+                        </td>
+                        <td className="p-4">
+                          <span className="font-bold text-brand-charcoal-dark block">
+                            {quote.clientName}
                           </span>
-                        )}
-                      </td>
-                      <td className="p-4 font-semibold text-neutral-700">
-                        {quote.totalAreaM2.toFixed(2)} m²
-                      </td>
-                      <td className="p-4 font-bold text-brand-red">
-                        {quote.suggestedFinalPrice.toLocaleString("pt-BR", {
-                          style: "currency",
-                          currency: "BRL",
-                        })}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(quote.status)}
-                          <select
-                            value={quote.status}
-                            onChange={(e) =>
-                              handleStatusChange(
-                                quote.id,
-                                e.target.value as QuoteStatus,
-                              )
-                            }
-                            className="text-[11px] bg-neutral-100 border border-neutral-200 rounded-lg px-2 py-1 focus:outline-none focus:border-brand-red font-semibold text-neutral-700"
+                          {quote.clientPhone && (
+                            <span className="text-neutral-400 text-[11px]">
+                              {quote.clientPhone}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4 font-semibold text-neutral-700">
+                          {quote.totalAreaM2.toFixed(2)} m²
+                        </td>
+                        <td className="p-4 font-bold text-brand-red">
+                          {effectivePrice.toLocaleString("pt-BR", {
+                            style: "currency",
+                            currency: "BRL",
+                          })}
+                          {quote.discountApplied > 0 && (
+                            <span className="block text-[10px] text-emerald-600 font-semibold">
+                              Desc: -{quote.discountApplied.toLocaleString("pt-BR", {
+                                style: "currency",
+                                currency: "BRL",
+                              })}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            {getStatusBadge(quote.status)}
+                            <select
+                              value={quote.status}
+                              onChange={(e) =>
+                                handleStatusChange(
+                                  quote.id,
+                                  e.target.value as QuoteStatus,
+                                )
+                              }
+                              className="text-[11px] bg-neutral-100 border border-neutral-200 rounded-lg px-2 py-1 focus:outline-none focus:border-brand-red font-semibold text-neutral-700"
+                            >
+                              <option value="PENDENTE">Pendente</option>
+                              <option value="APROVADO">Aprovado</option>
+                              <option value="EM_EXECUCAO">Em Obra</option>
+                              <option value="CONCLUIDO">Concluído</option>
+                              <option value="CANCELADO">Cancelado</option>
+                            </select>
+                          </div>
+                        </td>
+                        <td className="p-4 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              generateQuotePDF({
+                                clientName: quote.clientName,
+                                clientPhone: quote.clientPhone || "",
+                                rooms: quote.roomsData,
+                                quote: {
+                                  totalAreaM2: quote.totalAreaM2,
+                                  suggestedFinalPrice: quote.suggestedFinalPrice,
+                                  finalAgreedPrice: effectivePrice,
+                                },
+                              });
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-brand-red hover:text-white text-neutral-700 text-[11px] font-bold transition-all border border-neutral-200"
                           >
-                            <option value="PENDENTE">Pendente</option>
-                            <option value="APROVADO">Aprovado</option>
-                            <option value="EM_EXECUCAO">Em Obra</option>
-                            <option value="CONCLUIDO">Concluído</option>
-                            <option value="CANCELADO">Cancelado</option>
-                          </select>
-                        </div>
-                      </td>
-                      <td className="p-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            generateQuotePDF({
-                              clientName: quote.clientName,
-                              clientPhone: quote.clientPhone || "",
-                              rooms: quote.roomsData,
-                              quote: {
-                                totalAreaM2: quote.totalAreaM2,
-                                suggestedFinalPrice: quote.suggestedFinalPrice,
-                              },
-                            });
-                          }}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-neutral-100 hover:bg-brand-red hover:text-white text-neutral-700 text-[11px] font-bold transition-all border border-neutral-200"
-                        >
-                          <FileText className="w-3.5 h-3.5" /> PDF
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                            <FileText className="w-3.5 h-3.5" /> PDF
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
