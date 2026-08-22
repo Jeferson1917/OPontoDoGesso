@@ -8,9 +8,11 @@ import { defaultPricingConfig } from "../../data/pricingConfig";
 import { generateProjectQuote } from "../../utils/quoteEngine";
 import { logoutAdmin } from "../../actions/authActions";
 import { generateQuotePDF } from "../../utils/pdfGenerator";
+import { saveQuoteAction } from '../../actions/quoteActions';
+import { toast } from 'sonner';
 import { Download } from "lucide-react";
 import { LogOut, Settings } from "lucide-react";
-import { Trash2, Package, Plus, Calculator, FileText, CheckCircle2 } from "lucide-react";
+import { Trash2, Package, Plus, Calculator, FileText, CheckCircle2, BookmarkCheck } from "lucide-react";
 
 const MAX_DIMENSION_METERS = 100;
 const MAX_LINEAR_METERS = 500;
@@ -179,6 +181,30 @@ export default function AdminBudgetPage() {
 
   // Executar motor de cálculo
   const quoteResult = generateProjectQuote(rooms, pricingConfig);
+
+  // Função para disparar a Server Action com Toast elegante:
+  const handleSaveQuoteToDb = async () => {
+    if (!clientName.trim()) {
+      toast.error('Informe o nome do cliente antes de salvar.');
+      return;
+    }
+
+    const toastId = toast.loading('Salvando orçamento no banco de dados...');
+    const result = await saveQuoteAction({
+      clientName,
+      clientPhone,
+      totalAreaM2: quoteResult.totalAreaM2,
+      suggestedFinalPrice: quoteResult.suggestedFinalPrice,
+      roomsData: rooms,
+      materialsSnapshot: quoteResult.rooms,
+    });
+
+    if (result.success) {
+      toast.success('Orçamento salvo com sucesso!', { id: toastId });
+    } else {
+      toast.error(result.error || 'Erro ao salvar orçamento.', { id: toastId });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-neutral-100 text-neutral-900 p-4 sm:p-8">
@@ -533,6 +559,13 @@ export default function AdminBudgetPage() {
                 className="w-full bg-brand-red hover:bg-brand-red-dark text-white font-bold py-3.5 rounded-xl transition-all shadow-md text-center block"
               >
                 Enviar Orçamento via WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveQuoteToDb}
+                className="w-full mt-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all shadow-sm text-center text-xs flex items-center justify-center gap-2"
+              >
+                <BookmarkCheck className="w-4 h-4" /> Salvar Orçamento no Sistema
               </button>
               <button
                 type="button"
