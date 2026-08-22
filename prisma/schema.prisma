@@ -75,3 +75,18 @@ model PricingConfig {
 
   @@map("pricing_configs")
 }
+
+// Adicione ao final do prisma/schema.prisma:
+
+model StockBalance {
+  itemKey          String   @id // gessoPoKg, placaGesso60x60, gessoColaKg, arameGalvanizadoKg, sisalKg
+  name             String
+  unit             String
+  currentQuantity  Float
+  minThreshold     Float
+  averageUnitCost  Float
+  counterSalePrice Float
+  updatedAt        DateTime @updatedAt
+
+  @@map("stock_balances")
+}

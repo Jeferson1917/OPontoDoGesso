@@ -20,7 +20,7 @@ export default function AdminLoginPage() {
       if (res?.error) {
         setError(res.error);
       } else if (res?.success) {
-        router.push('/admin/orcamento');
+        router.push('/admin');
         router.refresh();
       }
     });
