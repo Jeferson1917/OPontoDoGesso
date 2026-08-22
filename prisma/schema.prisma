@@ -13,10 +13,12 @@ model Quote {
   clientName          String
   clientPhone         String?
   totalAreaM2         Float
-  suggestedFinalPrice Float
-  status              QuoteStatus  @default(PENDENTE) // PENDENTE, APROVADO, EM_EXECUCAO, CONCLUIDO, CANCELADO
-  roomsData           Json         // Detalhamento dos cômodos, metragens e serviços
-  materialsSnapshot   Json         // Lista consolidada de materiais calculados
+  suggestedFinalPrice Float        // Valor paramétrico de tabela
+  finalAgreedPrice    Float        @default(0.0) // <-- Adicionado @default(0.0)
+  discountApplied     Float        @default(0.0)
+  status              QuoteStatus  @default(PENDENTE)
+  roomsData           Json         
+  materialsSnapshot   Json         
   notes               String?
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt

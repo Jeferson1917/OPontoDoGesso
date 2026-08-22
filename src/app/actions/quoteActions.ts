@@ -1,3 +1,4 @@
+// src/app/actions/quoteActions.ts
 'use server';
 
 import { prisma } from '../../lib/prisma';
@@ -9,6 +10,8 @@ export interface CreateQuoteInput {
   clientPhone?: string;
   totalAreaM2: number;
   suggestedFinalPrice: number;
+  finalAgreedPrice: number;
+  discountApplied: number;
   roomsData: any;
   materialsSnapshot: any;
   notes?: string;
@@ -22,6 +25,8 @@ export async function saveQuoteAction(data: CreateQuoteInput) {
         clientPhone: data.clientPhone || null,
         totalAreaM2: data.totalAreaM2,
         suggestedFinalPrice: data.suggestedFinalPrice,
+        finalAgreedPrice: data.finalAgreedPrice,
+        discountApplied: data.discountApplied,
         roomsData: data.roomsData,
         materialsSnapshot: data.materialsSnapshot,
         notes: data.notes || null,
@@ -29,6 +34,7 @@ export async function saveQuoteAction(data: CreateQuoteInput) {
       },
     });
 
+    revalidatePath('/admin');
     revalidatePath('/admin/historico');
     return { success: true, quote: newQuote };
   } catch (error) {
@@ -56,6 +62,7 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
       data: { status },
     });
 
+    revalidatePath('/admin');
     revalidatePath('/admin/historico');
     return { success: true, quote: updated };
   } catch (error) {
