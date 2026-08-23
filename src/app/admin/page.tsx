@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { prisma } from '../../lib/prisma';
 import { logoutAdmin } from '../actions/authActions';
-import DashboardCharts from './DashboardCharts';
+import DashboardCharts, { MonthlyData } from './DashboardCharts';
 import { 
   Calculator, 
   Package, 
@@ -17,7 +17,8 @@ import {
   Layers,
   Clock,
   CheckCircle2,
-  PlayCircle
+  PlayCircle,
+  ShoppingBag
 } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
@@ -49,15 +50,28 @@ export default async function AdminDashboardPage() {
   const totalPlacas = placaItem ? placaItem.currentQuantity : 0;
   const isGessoLow = gessoItem ? gessoItem.currentQuantity <= gessoItem.minThreshold : false;
 
-  // Agrupamento dos últimos 6 meses para os Gráficos
+  // Agrupamento dos últimos 6 meses com cálculo segmentado de Balcão e Obras
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const now = new Date();
-  const monthlyMap = new Map<string, { faturamento: number; lucro: number; custo: number; gessoEntradaTon: number; gessoSaidaTon: number }>();
+  const monthlyMap = new Map<string, MonthlyData>();
 
   for (let i = 5; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const key = `${monthNames[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`;
-    monthlyMap.set(key, { faturamento: 0, lucro: 0, custo: 0, gessoEntradaTon: 0, gessoSaidaTon: 0 });
+    monthlyMap.set(key, {
+      month: key,
+      faturamento: 0,
+      lucro: 0,
+      custo: 0,
+      gessoEntradaTon: 0,
+      gessoSaidaTon: 0,
+      faturamentoBalcao: 0,
+      lucroBalcao: 0,
+      faturamentoObras: 0,
+      lucroObras: 0,
+      gessoObrasTon: 0,
+      gessoBalcaoTon: 0,
+    });
   }
 
   for (const q of approvedQuotes) {
@@ -68,11 +82,15 @@ export default async function AdminDashboardPage() {
       const price = getEffectivePrice(q);
       const estimatedCost = price * 0.62;
       const estimatedProfit = price - estimatedCost;
+      const tons = (q.totalAreaM2 * 2.5) / 1000;
 
       current.faturamento += price;
       current.lucro += estimatedProfit;
       current.custo += estimatedCost;
-      current.gessoSaidaTon += (q.totalAreaM2 * 2.5) / 1000;
+      current.faturamentoObras += price;
+      current.lucroObras += estimatedProfit;
+      current.gessoObrasTon += tons;
+      current.gessoSaidaTon += tons;
     }
   }
 
@@ -81,12 +99,16 @@ export default async function AdminDashboardPage() {
     const key = `${monthNames[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`;
     if (monthlyMap.has(key)) {
       const current = monthlyMap.get(key)!;
+      const cost = s.totalValue - s.estimatedProfit;
+      const tons = s.itemKey === 'gessoPoKg' ? s.quantity / 1000 : 0;
+
       current.faturamento += s.totalValue;
       current.lucro += s.estimatedProfit;
-      current.custo += s.totalValue - s.estimatedProfit;
-      if (s.itemKey === 'gessoPoKg') {
-        current.gessoSaidaTon += s.quantity / 1000;
-      }
+      current.custo += cost;
+      current.faturamentoBalcao += s.totalValue;
+      current.lucroBalcao += s.estimatedProfit;
+      current.gessoBalcaoTon += tons;
+      current.gessoSaidaTon += tons;
     }
   }
 
@@ -99,14 +121,7 @@ export default async function AdminDashboardPage() {
     }
   }
 
-  const monthlyFinancials = Array.from(monthlyMap.entries()).map(([month, data]) => ({
-    month,
-    faturamento: Math.round(data.faturamento),
-    lucro: Math.round(data.lucro),
-    custo: Math.round(data.custo),
-    gessoEntradaTon: Number(data.gessoEntradaTon.toFixed(1)),
-    gessoSaidaTon: Number(data.gessoSaidaTon.toFixed(1)),
-  }));
+  const monthlyFinancials = Array.from(monthlyMap.values());
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -127,7 +142,7 @@ export default async function AdminDashboardPage() {
     <div className="min-h-screen bg-[#f8f9fa] text-neutral-900 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* CABEÇALHO PRINCIPAL COM A LOGO OFICIAL */}
+        {/* CABEÇALHO PRINCIPAL COM LOGO */}
         <header className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-neutral-200 shadow-sm flex-shrink-0 bg-neutral-900">
@@ -175,7 +190,7 @@ export default async function AdminDashboardPage() {
           </div>
         </header>
 
-        {/* 4 CARDS DE MÉTRICAS RÁPIDAS (KPIs) */}
+        {/* 4 CARDS DE KPIS */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-2xl border border-neutral-200/80 shadow-sm space-y-3 relative overflow-hidden">
             <div className="flex items-center justify-between">
@@ -234,19 +249,33 @@ export default async function AdminDashboardPage() {
           </div>
         </section>
 
-        {/* SEÇÃO PRINCIPAL: GRÁFICO À ESQUERDA + ATALHOS INTELIGENTES À DIREITA */}
+        {/* SEÇÃO PRINCIPAL: GRÁFICOS SEGMENTADOS + NAVEGAÇÃO RÁPIDA */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
           
-          {/* Coluna 1 & 2: Gráficos de Tendência */}
           <div className="lg:col-span-2 space-y-6">
             <DashboardCharts monthlyFinancials={monthlyFinancials} />
           </div>
 
-          {/* Coluna 3: Navegação Rápida com Micro-status */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-400 px-1">
               Acesso aos Módulos Operacionais
             </h3>
+
+            <Link
+              href="/admin/balcao"
+              className="group bg-rose-500/10 hover:bg-rose-500/15 p-5 rounded-2xl border border-rose-200 shadow-sm transition-all flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3.5">
+                <div className="p-3 rounded-xl bg-brand-red text-white shadow-sm">
+                  <ShoppingBag className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-sm text-brand-charcoal-dark">Histórico do Balcão</h4>
+                  <p className="text-[11px] text-neutral-500">{recentSales.length} saídas avulsas</p>
+                </div>
+              </div>
+              <ArrowUpRight className="w-4 h-4 text-brand-red transition-colors" />
+            </Link>
 
             <Link
               href="/admin/orcamento"
@@ -314,7 +343,7 @@ export default async function AdminDashboardPage() {
           </div>
         </div>
 
-        {/* TABELA DE PROPOSTAS RECENTES COM BADGES */}
+        {/* TABELA DE PROPOSTAS RECENTES */}
         <section className="bg-white p-6 sm:p-8 rounded-3xl shadow-sm border border-neutral-200/80 space-y-4">
           <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
             <div>
