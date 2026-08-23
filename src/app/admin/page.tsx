@@ -3,7 +3,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { prisma } from '../../lib/prisma';
 import { logoutAdmin } from '../actions/authActions';
-import DashboardCharts, { MonthlyData } from './DashboardCharts';
+import ChartsWrapper from './ChartsWrapper';
+import { MonthlyData } from './DashboardCharts';
 import { 
   Calculator, 
   Package, 
@@ -31,11 +32,9 @@ export default async function AdminDashboardPage() {
     prisma.truckDelivery.findMany({ orderBy: { createdAt: 'desc' } }),
   ]);
 
-  // Função utilitária para pegar o valor efetivo negociado
   const getEffectivePrice = (q: any) =>
     q.finalAgreedPrice && q.finalAgreedPrice > 0 ? q.finalAgreedPrice : q.suggestedFinalPrice;
 
-  // Métricas Consolidadas
   const totalQuotesValue = quotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
   const approvedQuotes = quotes.filter(
     (q) => q.status === 'APROVADO' || q.status === 'EM_EXECUCAO' || q.status === 'CONCLUIDO'
@@ -50,7 +49,6 @@ export default async function AdminDashboardPage() {
   const totalPlacas = placaItem ? placaItem.currentQuantity : 0;
   const isGessoLow = gessoItem ? gessoItem.currentQuantity <= gessoItem.minThreshold : false;
 
-  // Agrupamento dos últimos 6 meses com cálculo segmentado de Balcão e Obras
   const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
   const now = new Date();
   const monthlyMap = new Map<string, MonthlyData>();
@@ -139,10 +137,10 @@ export default async function AdminDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-neutral-900 p-4 sm:p-8">
+    <main className="min-h-screen bg-[#f8f9fa] text-neutral-900 p-4 sm:p-8">
       <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* CABEÇALHO PRINCIPAL COM LOGO */}
+        {/* CABEÇALHO */}
         <header className="bg-white rounded-3xl p-6 sm:p-8 border border-neutral-200/80 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="flex items-center gap-5">
             <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl overflow-hidden border border-neutral-200 shadow-sm flex-shrink-0 bg-neutral-900">
@@ -150,6 +148,7 @@ export default async function AdminDashboardPage() {
                 src="/logo.jpg"
                 alt="Logo O Ponto do Gesso"
                 fill
+                sizes="80px"
                 className="object-cover"
                 priority
               />
@@ -214,7 +213,7 @@ export default async function AdminDashboardPage() {
               <p className="text-2xl sm:text-3xl font-black text-brand-charcoal-dark">
                 {quotes.length}
               </p>
-              <p className="text-xs text-neutral-500 mt-1 font-medium">Total em propostas: {totalQuotesValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</p>
+              <p className="text-xs text-neutral-500 mt-1 font-medium">Total: {totalQuotesValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</p>
             </div>
           </div>
 
@@ -244,16 +243,15 @@ export default async function AdminDashboardPage() {
               <p className="text-2xl sm:text-3xl font-black text-brand-red">
                 {counterSalesRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
               </p>
-              <p className="text-xs text-neutral-500 mt-1 font-medium">{recentSales.length} retiradas avulsas registradas</p>
+              <p className="text-xs text-neutral-500 mt-1 font-medium">{recentSales.length} retiradas avulsas</p>
             </div>
           </div>
         </section>
 
-        {/* SEÇÃO PRINCIPAL: GRÁFICOS SEGMENTADOS + NAVEGAÇÃO RÁPIDA */}
+        {/* SEÇÃO PRINCIPAL: GRÁFICO DIFERIDO + NAVEGAÇÃO RÁPIDA */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-          
           <div className="lg:col-span-2 space-y-6">
-            <DashboardCharts monthlyFinancials={monthlyFinancials} />
+            <ChartsWrapper monthlyFinancials={monthlyFinancials} />
           </div>
 
           <div className="space-y-4">
@@ -396,6 +394,6 @@ export default async function AdminDashboardPage() {
         </section>
 
       </div>
-    </div>
+    </main>
   );
 }
