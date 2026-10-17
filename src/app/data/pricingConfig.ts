@@ -29,3 +29,33 @@ export const defaultPricingConfig = {
   minimumProjectPrice: 300.0,    // Valor mínimo para cobrir deslocamento/dia de serviço
   profitMarginMultiplier: 1.35,  // 35% de margem sobre custo direto
 };
+export type PricingConfig = typeof defaultPricingConfig;
+
+const LOWER_BOUND: Partial<Record<keyof PricingConfig, number>> = {
+  profitMarginMultiplier: 1,
+  wasteFactor: 1,
+};
+
+const validNumber = (value: unknown, min: number, fallback: number) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= min ? value : fallback;
+
+function mergeNumberMap<T extends Record<string, number>>(defaults: T, input: unknown): T {
+  const source = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  const result = { ...defaults };
+  for (const key of Object.keys(defaults) as (keyof T)[]) {
+    result[key] = validNumber(source[key as string], 0, defaults[key]) as T[keyof T];
+  }
+  return result;
+}
+
+// Completa com os padrões e descarta valores inválidos (negativos, NaN, chaves desconhecidas)
+export function sanitizePricingConfig(input: unknown): PricingConfig {
+  const source = (input && typeof input === 'object' ? input : {}) as Record<string, unknown>;
+  return {
+    wasteFactor: validNumber(source.wasteFactor, LOWER_BOUND.wasteFactor!, defaultPricingConfig.wasteFactor),
+    laborRates: mergeNumberMap(defaultPricingConfig.laborRates, source.laborRates),
+    materialCosts: mergeNumberMap(defaultPricingConfig.materialCosts, source.materialCosts),
+    minimumProjectPrice: validNumber(source.minimumProjectPrice, 0, defaultPricingConfig.minimumProjectPrice),
+    profitMarginMultiplier: validNumber(source.profitMarginMultiplier, LOWER_BOUND.profitMarginMultiplier!, defaultPricingConfig.profitMarginMultiplier),
+  };
+}
