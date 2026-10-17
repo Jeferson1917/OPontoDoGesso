@@ -4,6 +4,7 @@ import { prisma } from '../../../lib/prisma';
 import { requireAdminPage } from '../../../lib/auth';
 import { stockItemLabel } from '../../data/stockTypes';
 import { ArrowLeft, ShoppingBag, Package } from 'lucide-react';
+import { formatBusinessDate } from '../../utils/dates';
 
 export const dynamic = 'force-dynamic';
 
@@ -109,7 +110,7 @@ export default async function AdminCounterSalesHistoryPage() {
                 {sales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-neutral-50/70 transition-colors">
                     <td className="py-3.5 px-2 text-neutral-500 font-medium whitespace-nowrap">
-                      {new Date(sale.createdAt).toLocaleDateString('pt-BR', {
+                      {formatBusinessDate(sale.createdAt, {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',

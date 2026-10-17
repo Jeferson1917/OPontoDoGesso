@@ -1,5 +1,6 @@
 import { AlertTriangle, History, RefreshCw } from 'lucide-react';
 import type { StockBalanceRow, TruckDeliveryRow } from './types';
+import { formatBusinessDate } from '../../../utils/dates';
 
 interface StockOverviewProps {
   balances: StockBalanceRow[];
@@ -112,7 +113,7 @@ export function StockOverview({ balances, deliveries, loading, onRefresh }: Stoc
                 {deliveries.map((del) => (
                   <tr key={del.id} className="hover:bg-neutral-50/50">
                     <td className="py-3 font-semibold text-neutral-600">
-                      {new Date(del.createdAt).toLocaleDateString('pt-BR')}
+                      {formatBusinessDate(del.createdAt)}
                     </td>
                     <td className="py-3 text-neutral-700 font-bold">{del.supplier}</td>
                     <td className="py-3 text-right font-bold text-brand-charcoal-dark">
