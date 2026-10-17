@@ -8,6 +8,7 @@ import { generateProjectQuote } from "../../utils/quoteEngine";
 import { logoutAdmin } from "../../actions/authActions";
 import { generateQuotePDF } from "../../utils/pdfGenerator";
 import { saveQuoteAction } from "../../actions/quoteActions";
+import { loadPricingConfig } from "../../utils/pricingClient";
 import { toast } from "sonner";
 import { Download, LogOut, Settings, Trash2, Package, Plus, Calculator, BookmarkCheck, AlertTriangle } from "lucide-react";
 
@@ -46,26 +47,10 @@ export default function AdminBudgetPage() {
   const [isCustomPriceActive, setIsCustomPriceActive] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("opontodogesso_pricing_config");
-    if (!saved) return;
-
-    try {
-      const parsedConfig = JSON.parse(saved);
-      setPricingConfig({
-        ...defaultPricingConfig,
-        ...parsedConfig,
-        laborRates: {
-          ...defaultPricingConfig.laborRates,
-          ...(parsedConfig?.laborRates ?? {}),
-        },
-        materialCosts: {
-          ...defaultPricingConfig.materialCosts,
-          ...(parsedConfig?.materialCosts ?? {}),
-        },
-      });
-    } catch (err) {
-      console.error("Erro ao ler preços personalizados:", err);
-    }
+    loadPricingConfig().then(({ config, error }) => {
+      setPricingConfig(config);
+      if (error) toast.error(`${error} Usando os preços padrão.`);
+    });
   }, []);
 
   const handleAddRoom = () => {

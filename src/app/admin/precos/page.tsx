@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { defaultPricingConfig } from '../../data/pricingConfig';
+import { resetPricingConfigAction, savePricingConfigAction } from '../../actions/pricingActions';
+import { loadPricingConfig } from '../../utils/pricingClient';
 import {
   ArrowLeft,
   Settings,
@@ -20,23 +22,13 @@ export default function AdminPricingPage() {
   const [config, setConfig] = useState(defaultPricingConfig);
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Carrega configurações salvas no localStorage
+  // Carrega a tabela de preços do banco (compartilhada entre todos os dispositivos)
   useEffect(() => {
-    setIsLoaded(true);
-    const saved = localStorage.getItem('opontodogesso_pricing_config');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        setConfig({
-          ...defaultPricingConfig,
-          ...parsed,
-          laborRates: { ...defaultPricingConfig.laborRates, ...(parsed.laborRates || {}) },
-          materialCosts: { ...defaultPricingConfig.materialCosts, ...(parsed.materialCosts || {}) },
-        });
-      } catch (err) {
-        console.error('Erro ao ler configurações salvas:', err);
-      }
-    }
+    loadPricingConfig().then(({ config: loaded, error }) => {
+      setConfig(loaded);
+      setIsLoaded(true);
+      if (error) toast.error(error);
+    });
   }, []);
 
   const handleLaborChange = (key: keyof typeof defaultPricingConfig.laborRates, value: number) => {
@@ -63,20 +55,24 @@ export default function AdminPricingPage() {
     }));
   };
 
-  const handleSave = () => {
-    try {
-      localStorage.setItem('opontodogesso_pricing_config', JSON.stringify(config));
+  const handleSave = async () => {
+    const res = await savePricingConfigAction(config);
+    if (res.success) {
+      setConfig(res.config);
       toast.success('Tabela de preços e coeficientes atualizada com sucesso!');
-    } catch (err) {
-      toast.error('Erro ao salvar as configurações de preços.');
+    } else {
+      toast.error(res.error);
     }
   };
 
-  const handleReset = () => {
-    if (confirm('Deseja restaurar todos os valores para o padrão original de fábrica?')) {
-      setConfig(defaultPricingConfig);
-      localStorage.removeItem('opontodogesso_pricing_config');
+  const handleReset = async () => {
+    if (!confirm('Deseja restaurar todos os valores para o padrão original de fábrica?')) return;
+    const res = await resetPricingConfigAction();
+    if (res.success) {
+      setConfig(res.config);
       toast.info('Valores originais restaurados com sucesso.');
+    } else {
+      toast.error(res.error);
     }
   };
 
