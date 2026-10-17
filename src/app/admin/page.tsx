@@ -1,7 +1,7 @@
 // src/app/admin/page.tsx
 import Link from 'next/link';
 import Image from 'next/image';
-import { prisma, toNumber } from '../../lib/prisma';
+import { prisma } from '../../lib/prisma';
 import { requireAdminPage } from '../../lib/auth';
 import { logoutAdmin } from '../actions/authActions';
 import ChartsWrapper from './ChartsWrapper';
@@ -22,6 +22,7 @@ import {
   PlayCircle,
   ShoppingBag
 } from 'lucide-react';
+import { formatBusinessDate } from '../utils/dates';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,7 +57,7 @@ export default async function AdminDashboardPage() {
   const totalQuotesValue = quotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
   const approvedQuotes = quotes.filter((q) => isApproved(q.status));
   const approvedRevenue = approvedQuotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
-  const counterSalesRevenue = toNumber(salesTotals._sum.totalValue);
+  const counterSalesRevenue = salesTotals._sum.totalValue ?? 0;
   const counterSalesCount = salesTotals._count;
 
   const gessoItem = stockBalances.find((s) => s.itemKey === 'gessoPoKg');
@@ -106,7 +107,7 @@ export default async function AdminDashboardPage() {
                   Painel Executivo
                 </span>
                 <span className="text-xs text-neutral-400 font-medium">
-                  {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  {formatBusinessDate(new Date(), { weekday: 'long', day: 'numeric', month: 'long' })}
                 </span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-brand-charcoal-dark tracking-tight mt-1">

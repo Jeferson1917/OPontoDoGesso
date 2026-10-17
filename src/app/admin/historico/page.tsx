@@ -19,6 +19,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { QuoteStatus } from "@prisma/client";
+import { formatBusinessDate } from "../../utils/dates";
 
 type QuotesResult = Awaited<ReturnType<typeof getQuotesAction>>;
 type QuoteRow = Extract<QuotesResult, { success: true }>["quotes"][number];
@@ -162,7 +163,7 @@ export default function AdminQuotesHistoryPage() {
                         className="hover:bg-neutral-50/60 transition-colors"
                       >
                         <td className="p-4 font-medium text-neutral-500">
-                          {new Date(quote.createdAt).toLocaleDateString("pt-BR")}
+                          {formatBusinessDate(quote.createdAt)}
                         </td>
                         <td className="p-4">
                           <span className="font-bold text-brand-charcoal-dark block">
