@@ -8,6 +8,7 @@ import { getQuoteStockQuantities, legacyStockQuantities, type StockQuantities } 
 import { getAdminSession, unauthorized } from '../../lib/auth';
 import { z } from 'zod';
 import { createQuoteSchema, idSchema, parseInput, quoteStatusSchema } from '../data/schemas';
+import { canChangeStatus, QUOTE_STATUS_LABELS } from '../data/quoteStatus';
 
 export type CreateQuoteInput = z.input<typeof createQuoteSchema>;
 
@@ -73,6 +74,9 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
   try {
     const quote = await prisma.quote.findUnique({ where: { id } });
     if (!quote) return { success: false as const, error: 'Orçamento não encontrado.' };
+    if (quote.status !== status && !canChangeStatus(quote.status, status)) {
+      return { success: false as const, error: `Não é possível mudar de ${QUOTE_STATUS_LABELS[quote.status]} para ${QUOTE_STATUS_LABELS[status]}.` };
+    }
 
     const isApprovedStatus = status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'CONCLUIDO';
     const shouldDeduct = isApprovedStatus && !quote.stockDeducted;

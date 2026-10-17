@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { QuoteStatus } from "@prisma/client";
 import { formatBusinessDate } from "../../utils/dates";
+import { ALLOWED_STATUS_TRANSITIONS, QUOTE_STATUS_LABELS } from "../../data/quoteStatus";
 
 type QuotesResult = Awaited<ReturnType<typeof getQuotesAction>>;
 type QuoteRow = Extract<QuotesResult, { success: true }>["quotes"][number];
@@ -205,11 +206,12 @@ export default function AdminQuotesHistoryPage() {
                               }
                               className="text-[11px] bg-neutral-100 border border-neutral-200 rounded-lg px-2 py-1 focus:outline-none focus:border-brand-red font-semibold text-neutral-700"
                             >
-                              <option value="PENDENTE">Pendente</option>
-                              <option value="APROVADO">Aprovado</option>
-                              <option value="EM_EXECUCAO">Em Obra</option>
-                              <option value="CONCLUIDO">Concluído</option>
-                              <option value="CANCELADO">Cancelado</option>
+                              {/* Só o status atual e as transições permitidas */}
+                              {[quote.status, ...ALLOWED_STATUS_TRANSITIONS[quote.status]].map((status) => (
+                                <option key={status} value={status}>
+                                  {QUOTE_STATUS_LABELS[status]}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         </td>
