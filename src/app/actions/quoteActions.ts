@@ -62,6 +62,11 @@ export async function getQuotesAction() {
   }
 }
 
+// Erro de regra de negócio do estoque: a mensagem vai direto para a tela
+class QuoteStockError extends Error {}
+
+const formatQty = (value: number) => Number(value.toFixed(2)).toLocaleString('pt-BR');
+
 export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
   if (!(await getAdminSession())) return unauthorized();
 
@@ -79,18 +84,35 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
       // 1. Aplica a baixa no estoque com as mesmas quantidades do orçamento e grava o que saiu
       if (shouldDeduct) {
         const movement = getQuoteStockQuantities(quote.roomsData, quote.materialsSnapshot);
+        const shortages: string[] = [];
+
         for (const [itemKey, qty] of Object.entries(movement)) {
-          if (qty > 0) {
-            await tx.stockBalance.update({
-              where: { itemKey },
-              data: { currentQuantity: { decrement: qty } },
-            });
+          if (qty <= 0) continue;
+          // Decremento condicional: atômico, nunca deixa o saldo negativo mesmo com aprovações simultâneas
+          const { count } = await tx.stockBalance.updateMany({
+            where: { itemKey, currentQuantity: { gte: qty } },
+            data: { currentQuantity: { decrement: qty } },
+          });
+          if (count === 0) {
+            const item = await tx.stockBalance.findUnique({ where: { itemKey } });
+            shortages.push(
+              item
+                ? `${item.name} (tem ${formatQty(item.currentQuantity)} ${item.unit}, precisa ${formatQty(qty)})`
+                : `${itemKey} (item não cadastrado no estoque)`
+            );
           }
         }
-        await tx.quote.update({
-          where: { id },
+
+        if (shortages.length > 0) {
+          throw new QuoteStockError(`Estoque insuficiente: ${shortages.join('; ')}.`);
+        }
+
+        // Só marca como baixado se ainda não estava — evita baixa dupla em cliques simultâneos
+        const { count } = await tx.quote.updateMany({
+          where: { id, stockDeducted: false },
           data: { status, stockDeducted: true, stockMovement: movement },
         });
+        if (count === 0) throw new QuoteStockError('Este orçamento já teve o estoque baixado. Atualize a página.');
       }
       // 2. Estorna exatamente o que saiu; baixas antigas (sem stockMovement) usam a fórmula da época
       else if (shouldRefund) {
@@ -103,10 +125,12 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
             });
           }
         }
-        await tx.quote.update({
-          where: { id },
+        // Só estorna se ainda estava baixado — evita devolução dupla em cliques simultâneos
+        const { count } = await tx.quote.updateMany({
+          where: { id, stockDeducted: true },
           data: { status, stockDeducted: false, stockMovement: Prisma.DbNull },
         });
+        if (count === 0) throw new QuoteStockError('Este orçamento já teve o estoque devolvido. Atualize a página.');
       }
       // 3. Apenas troca de status sem alterar estoque (ex: de APROVADO para EM_EXECUCAO)
       else {
@@ -115,7 +139,7 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
           data: { status },
         });
       }
-    });
+    }, { maxWait: 10_000, timeout: 20_000 }); // Neon tem latência alta; o padrão de 5s é curto
 
     revalidatePath('/admin');
     revalidatePath('/admin/historico');
@@ -127,6 +151,10 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
       refunded: shouldRefund,
     };
   } catch (error) {
+    if (error instanceof QuoteStockError) return { success: false, error: error.message };
+    if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2028' || error.code === 'P2034')) {
+      return { success: false, error: 'Outra alteração de estoque estava em andamento. Tente novamente.' };
+    }
     console.error('Erro ao atualizar status e estoque:', error);
     return { success: false, error: 'Falha ao atualizar status e movimentar estoque.' };
   }
