@@ -1,34 +1,21 @@
 // src/app/admin/balcao/page.tsx
 import Link from 'next/link';
 import { prisma } from '../../../lib/prisma';
-import { ArrowLeft, ShoppingBag, Search, DollarSign, Calendar, TrendingUp, Package } from 'lucide-react';
+import { requireAdminPage } from '../../../lib/auth';
+import { stockItemLabel } from '../../data/stockTypes';
+import { ArrowLeft, ShoppingBag, Package } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminCounterSalesHistoryPage() {
+  await requireAdminPage();
+
   const sales = await prisma.counterSale.findMany({
     orderBy: { createdAt: 'desc' },
   });
 
   const totalValueAll = sales.reduce((acc, s) => acc + s.totalValue, 0);
   const totalProfitAll = sales.reduce((acc, s) => acc + s.estimatedProfit, 0);
-
-  const getItemLabel = (key: string) => {
-    switch (key) {
-      case 'gessoPoKg':
-        return 'Gesso em Pó (kg)';
-      case 'placaGesso60x60':
-        return 'Placa de Gesso 60x60';
-      case 'gessoColaKg':
-        return 'Gesso Cola (kg)';
-      case 'arameGalvanizadoKg':
-        return 'Arame Galvanizado (kg)';
-      case 'sisalKg':
-        return 'Sisal / Juta (kg)';
-      default:
-        return key;
-    }
-  };
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-neutral-900 p-4 sm:p-8">
@@ -134,7 +121,7 @@ export default async function AdminCounterSalesHistoryPage() {
                       {sale.customerName || 'Cliente Balcão'}
                     </td>
                     <td className="py-3.5 px-2 text-neutral-700 font-semibold">
-                      {getItemLabel(sale.itemKey)}
+                      {stockItemLabel(sale.itemKey)}
                     </td>
                     <td className="py-3.5 px-2 font-black text-brand-charcoal-dark">
                       {sale.quantity}

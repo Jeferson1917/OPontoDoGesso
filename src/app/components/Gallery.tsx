@@ -3,18 +3,18 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { Camera, ArrowRight, Sparkles, Eye } from 'lucide-react';
-import { galleryItems } from '../data/gallery';
+import type { GalleryItem } from '../data/gallery';
 import { companyData } from '../data/company';
 
-export function Gallery() {
+export function Gallery({ items }: { items: GalleryItem[] }) {
   const [selectedFilter, setSelectedFilter] = useState('Todos');
 
-  const categories = ['Todos', ...Array.from(new Set(galleryItems.map((item) => item.category)))];
+  const categories = ['Todos', ...Array.from(new Set(items.map((item) => item.category)))];
 
   const filteredItems =
     selectedFilter === 'Todos'
-      ? galleryItems
-      : galleryItems.filter((item) => item.category === selectedFilter);
+      ? items
+      : items.filter((item) => item.category === selectedFilter);
 
   return (
     <section id="galeria" className="py-20 lg:py-28 bg-[#f8f9fa] border-b border-neutral-200/80 relative">
@@ -67,7 +67,7 @@ export function Gallery() {
 
         {/* GRID DE CARDS COM SUPORTE A FOTO REAL OU PLACEHOLDER */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {filteredItems.map((item: any, idx) => (
+          {filteredItems.map((item, idx) => (
             <div
               key={idx}
               className="group relative bg-white rounded-3xl overflow-hidden border border-neutral-200/80 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col justify-between"
@@ -79,6 +79,7 @@ export function Gallery() {
                     src={item.image}
                     alt={item.title}
                     fill
+                    sizes="(min-width: 1024px) 25vw, (min-width: 640px) 50vw, 100vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                 ) : (

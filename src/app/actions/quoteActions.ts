@@ -1,35 +1,35 @@
 // src/app/actions/quoteActions.ts
 'use server';
 
-import { prisma } from '../../lib/prisma';
+import { prisma, toPlain } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { QuoteStatus } from '@prisma/client';
+import { Prisma, QuoteStatus } from '@prisma/client';
+import { getQuoteStockQuantities, legacyStockQuantities, type StockQuantities } from '../utils/stockConsumption';
+import { getAdminSession, unauthorized } from '../../lib/auth';
+import { z } from 'zod';
+import { createQuoteSchema, idSchema, parseInput, quoteStatusSchema } from '../data/schemas';
 
-export interface CreateQuoteInput {
-  clientName: string;
-  clientPhone?: string;
-  totalAreaM2: number;
-  suggestedFinalPrice: number;
-  finalAgreedPrice: number;
-  discountApplied: number;
-  roomsData: any;
-  materialsSnapshot: any;
-  notes?: string;
-}
+export type CreateQuoteInput = z.input<typeof createQuoteSchema>;
 
-export async function saveQuoteAction(data: CreateQuoteInput) {
+export async function saveQuoteAction(input: CreateQuoteInput) {
+  if (!(await getAdminSession())) return unauthorized();
+
+  const parsed = parseInput(createQuoteSchema, input);
+  if (!parsed.ok) return { success: false as const, error: parsed.error };
+  const data = parsed.data;
+
   try {
     const newQuote = await prisma.quote.create({
       data: {
         clientName: data.clientName,
-        clientPhone: data.clientPhone || null,
+        clientPhone: data.clientPhone ?? null,
         totalAreaM2: data.totalAreaM2,
         suggestedFinalPrice: data.suggestedFinalPrice,
         finalAgreedPrice: data.finalAgreedPrice,
         discountApplied: data.discountApplied,
         roomsData: data.roomsData,
         materialsSnapshot: data.materialsSnapshot,
-        notes: data.notes || null,
+        notes: data.notes ?? null,
         status: 'PENDENTE',
         stockDeducted: false,
       },
@@ -37,127 +37,89 @@ export async function saveQuoteAction(data: CreateQuoteInput) {
 
     revalidatePath('/admin');
     revalidatePath('/admin/historico');
-    return { success: true, quote: newQuote };
+    return { success: true as const, quote: toPlain(newQuote) };
   } catch (error) {
     console.error('Erro ao salvar orçamento:', error);
-    return { success: false, error: 'Falha ao salvar o orçamento no banco de dados.' };
+    return { success: false as const, error: 'Falha ao salvar o orçamento no banco de dados.' };
   }
 }
 
 export async function getQuotesAction() {
+  if (!(await getAdminSession())) return unauthorized();
+
   try {
     const quotes = await prisma.quote.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    return { success: true, quotes };
+    return { success: true as const, quotes: quotes.map(toPlain) };
   } catch (error) {
     console.error('Erro ao buscar orçamentos:', error);
-    return { success: false, error: 'Falha ao carregar lista de orçamentos.' };
+    return { success: false as const, error: 'Falha ao carregar lista de orçamentos.' };
   }
 }
 
-// Extrator resiliente: calcula diretamente a partir das metragens se o snapshot estiver vazio
-function calculateMaterialsFromRoomsOrSnapshot(roomsData: any, snapshot: any) {
-  const totals: Record<string, number> = {
-    gessoPoKg: 0,
-    placaGesso60x60: 0,
-    gessoColaKg: 0,
-    arameGalvanizadoKg: 0,
-    sisalKg: 0,
-  };
+// Erro de regra de negócio do estoque: a mensagem vai direto para a tela
+class QuoteStockError extends Error {}
 
-  const addValues = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return;
-    if (obj.gessoPoKg) totals.gessoPoKg += Number(obj.gessoPoKg) || 0;
-    if (obj.placasGesso60x60) totals.placaGesso60x60 += Number(obj.placasGesso60x60) || 0;
-    if (obj.placaGesso60x60) totals.placaGesso60x60 += Number(obj.placaGesso60x60) || 0;
-    if (obj.gessoColaKg) totals.gessoColaKg += Number(obj.gessoColaKg) || 0;
-    if (obj.arameGalvanizadoKg) totals.arameGalvanizadoKg += Number(obj.arameGalvanizadoKg) || 0;
-    if (obj.sisalKg) totals.sisalKg += Number(obj.sisalKg) || 0;
-  };
-
-  // 1. Tenta extrair do snapshot
-  if (snapshot) {
-    if (snapshot.totalMaterials) {
-      addValues(snapshot.totalMaterials);
-    } else if (Array.isArray(snapshot)) {
-      for (const item of snapshot) {
-        addValues(item.materials || item);
-      }
-    } else if (snapshot.rooms && Array.isArray(snapshot.rooms)) {
-      for (const item of snapshot.rooms) {
-        addValues(item.materials || item);
-      }
-    } else {
-      addValues(snapshot);
-    }
-  }
-
-  // 2. Fallback: Se o snapshot estava vazio ou incompatível, calcula na hora com base na regra técnica padrão do gesso
-  const totalExtracted = Object.values(totals).reduce((a, b) => a + b, 0);
-  if (totalExtracted === 0 && Array.isArray(roomsData)) {
-    for (const r of roomsData) {
-      const area = (Number(r.lengthMeters) || 0) * (Number(r.widthMeters) || 0);
-      const perimeter = 2 * ((Number(r.lengthMeters) || 0) + (Number(r.widthMeters) || 0));
-
-      const services = Array.isArray(r.services) ? r.services : [];
-      for (const s of services) {
-        if (s.type === 'FORRO_PLAQUINHA_60X60' || !s.type) {
-          // Rendimento técnico: 2.78 placas/m² + 5% quebra = ~2.92 un/m²; Gesso pó chumbamento: ~2.5 kg/m²
-          totals.placaGesso60x60 += Math.ceil(area * 2.92);
-          totals.gessoPoKg += Number((area * 2.5).toFixed(1));
-          totals.arameGalvanizadoKg += Number((area * 0.08).toFixed(2));
-          totals.sisalKg += Number((area * 0.05).toFixed(2));
-        } else if (s.type === 'REVESTIMENTO_GESSO_LISO') {
-          // Rendimento: ~5 kg de pó por m²
-          totals.gessoPoKg += Number((area * 5.0).toFixed(1));
-        } else if (s.type.includes('MOLDURA') || s.type.includes('SANCA') || s.type.includes('CORTINEIRO')) {
-          const linearM = Number(s.customLinearMeters) || perimeter;
-          totals.gessoColaKg += Number((linearM * 0.25).toFixed(1));
-          totals.gessoPoKg += Number((linearM * 1.5).toFixed(1));
-        }
-      }
-    }
-  }
-
-  return totals;
-}
+const formatQty = (value: number) => Number(value.toFixed(2)).toLocaleString('pt-BR');
 
 export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
-  try {
-    const quote = (await prisma.quote.findUnique({ where: { id } })) as any;
-    if (!quote) return { success: false, error: 'Orçamento não encontrado.' };
+  if (!(await getAdminSession())) return unauthorized();
 
-    const shouldDeduct =
-      (status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'CONCLUIDO') &&
-      !quote.stockDeducted;
+  const parsedId = parseInput(idSchema, id);
+  const parsedStatus = parseInput(quoteStatusSchema, status);
+  if (!parsedId.ok || !parsedStatus.ok) return { success: false as const, error: 'Orçamento ou status inválido.' };
+
+  try {
+    const quote = await prisma.quote.findUnique({ where: { id } });
+    if (!quote) return { success: false as const, error: 'Orçamento não encontrado.' };
+
+    const isApprovedStatus = status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'CONCLUIDO';
+    const shouldDeduct = isApprovedStatus && !quote.stockDeducted;
     const shouldRefund =
       (status === 'CANCELADO' || status === 'PENDENTE') && quote.stockDeducted;
 
-    // Obtém materiais de forma garantida (lendo snapshot ou calculando na hora)
-    const materials = calculateMaterialsFromRoomsOrSnapshot(quote.roomsData, quote.materialsSnapshot);
-
-    console.log('[DEBUG ESTOQUE] Materiais calculados para movimentação:', materials);
+    // Data de aprovação: preservada entre APROVADO/EM_EXECUCAO/CONCLUIDO, limpa se voltar a pendente ou cancelar
+    const approvedAt = isApprovedStatus ? (quote.approvedAt ?? new Date()) : null;
 
     await prisma.$transaction(async (tx) => {
-      // 1. Aplica a baixa no estoque
+      // 1. Aplica a baixa no estoque com as mesmas quantidades do orçamento e grava o que saiu
       if (shouldDeduct) {
-        for (const [itemKey, qty] of Object.entries(materials)) {
-          if (qty > 0) {
-            await tx.stockBalance.update({
-              where: { itemKey },
-              data: { currentQuantity: { decrement: Number(qty.toFixed(2)) } },
-            });
+        const movement = getQuoteStockQuantities(quote.roomsData, quote.materialsSnapshot);
+        const shortages: string[] = [];
+
+        for (const [itemKey, qty] of Object.entries(movement)) {
+          if (qty <= 0) continue;
+          // Decremento condicional: atômico, nunca deixa o saldo negativo mesmo com aprovações simultâneas
+          const { count } = await tx.stockBalance.updateMany({
+            where: { itemKey, currentQuantity: { gte: qty } },
+            data: { currentQuantity: { decrement: qty } },
+          });
+          if (count === 0) {
+            const item = await tx.stockBalance.findUnique({ where: { itemKey } });
+            shortages.push(
+              item
+                ? `${item.name} (tem ${formatQty(item.currentQuantity)} ${item.unit}, precisa ${formatQty(qty)})`
+                : `${itemKey} (item não cadastrado no estoque)`
+            );
           }
         }
-        await tx.quote.update({
-          where: { id },
-          data: { status, stockDeducted: true },
+
+        if (shortages.length > 0) {
+          throw new QuoteStockError(`Estoque insuficiente: ${shortages.join('; ')}.`);
+        }
+
+        // Só marca como baixado se ainda não estava — evita baixa dupla em cliques simultâneos
+        const { count } = await tx.quote.updateMany({
+          where: { id, stockDeducted: false },
+          data: { status, approvedAt, stockDeducted: true, stockMovement: movement },
         });
+        if (count === 0) throw new QuoteStockError('Este orçamento já teve o estoque baixado. Atualize a página.');
       }
-      // 2. Estorna materiais se a obra for cancelada ou voltar a ser pendente
+      // 2. Estorna exatamente o que saiu; baixas antigas (sem stockMovement) usam a fórmula da época
       else if (shouldRefund) {
-        for (const [itemKey, qty] of Object.entries(materials)) {
+        const movement = (quote.stockMovement as StockQuantities | null) ?? legacyStockQuantities(quote.roomsData);
+        for (const [itemKey, qty] of Object.entries(movement)) {
           if (qty > 0) {
             await tx.stockBalance.update({
               where: { itemKey },
@@ -165,31 +127,37 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
             });
           }
         }
-        await tx.quote.update({
-          where: { id },
-          data: { status, stockDeducted: false },
+        // Só estorna se ainda estava baixado — evita devolução dupla em cliques simultâneos
+        const { count } = await tx.quote.updateMany({
+          where: { id, stockDeducted: true },
+          data: { status, approvedAt, stockDeducted: false, stockMovement: Prisma.DbNull },
         });
+        if (count === 0) throw new QuoteStockError('Este orçamento já teve o estoque devolvido. Atualize a página.');
       }
       // 3. Apenas troca de status sem alterar estoque (ex: de APROVADO para EM_EXECUCAO)
       else {
         await tx.quote.update({
           where: { id },
-          data: { status },
+          data: { status, approvedAt },
         });
       }
-    });
+    }, { maxWait: 10_000, timeout: 20_000 }); // Neon tem latência alta; o padrão de 5s é curto
 
     revalidatePath('/admin');
     revalidatePath('/admin/historico');
     revalidatePath('/admin/estoque');
 
     return {
-      success: true,
+      success: true as const,
       deducted: shouldDeduct,
       refunded: shouldRefund,
     };
   } catch (error) {
+    if (error instanceof QuoteStockError) return { success: false as const, error: error.message };
+    if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2028' || error.code === 'P2034')) {
+      return { success: false as const, error: 'Outra alteração de estoque estava em andamento. Tente novamente.' };
+    }
     console.error('Erro ao atualizar status e estoque:', error);
-    return { success: false, error: 'Falha ao atualizar status e movimentar estoque.' };
+    return { success: false as const, error: 'Falha ao atualizar status e movimentar estoque.' };
   }
 }

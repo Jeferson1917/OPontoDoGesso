@@ -1,10 +1,9 @@
 import type { NextConfig } from "next";
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+
+const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts'],
   },
 };
-
 
 export default nextConfig;

@@ -1,41 +1,22 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
-
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.AUTH_SECRET || 'chave_padrao_temporaria_32_caracteres_min'
-);
+import { SESSION_COOKIE, verifySessionToken } from './lib/session';
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const session = await verifySessionToken(request.cookies.get(SESSION_COOKIE)?.value);
 
   // Apenas rotas /admin que NÃO sejam /admin/login
   if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
-    const sessionToken = request.cookies.get('admin_session')?.value;
-
-    if (!sessionToken) {
+    if (!session) {
       return NextResponse.redirect(new URL('/admin/login', request.url));
     }
-
-    try {
-      await jwtVerify(sessionToken, SECRET_KEY);
-      return NextResponse.next();
-    } catch {
-      return NextResponse.redirect(new URL('/admin/login', request.url));
-    }
+    return NextResponse.next();
   }
 
   // Se já estiver logada e tentar acessar /admin/login, manda direto pro orçamento
-  if (pathname === '/admin/login') {
-    const sessionToken = request.cookies.get('admin_session')?.value;
-    if (sessionToken) {
-      try {
-        await jwtVerify(sessionToken, SECRET_KEY);
-        return NextResponse.redirect(new URL('/admin/orcamento', request.url));
-      } catch {
-        // Token inválido, deixa ir pro login normalmente
-      }
-    }
+  if (pathname === '/admin/login' && session) {
+    return NextResponse.redirect(new URL('/admin/orcamento', request.url));
   }
 
   return NextResponse.next();
