@@ -221,6 +221,7 @@ export default function AdminQuotesHistoryPage() {
                                 clientName: quote.clientName,
                                 clientPhone: quote.clientPhone || "",
                                 rooms: quote.roomsData as unknown as RoomInput[], // validado pelo zod ao salvar
+                                issuedAt: quote.createdAt,
                                 quote: {
                                   totalAreaM2: quote.totalAreaM2,
                                   suggestedFinalPrice: quote.suggestedFinalPrice,
