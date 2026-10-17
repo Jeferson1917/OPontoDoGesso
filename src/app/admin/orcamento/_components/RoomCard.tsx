@@ -1,6 +1,6 @@
 import { Trash2 } from 'lucide-react';
 import type { RoomInput, RoomServiceItem } from '../../../data/calculatorTypes';
-import { MAX_DIMENSION_METERS, MAX_LINEAR_METERS } from './limits';
+import { DEFAULT_WALL_HEIGHT_METERS, MAX_DIMENSION_METERS, MAX_LINEAR_METERS, MAX_WALL_HEIGHT_METERS } from './limits';
 
 interface RoomCardProps {
   room: RoomInput;
@@ -13,6 +13,10 @@ interface RoomCardProps {
 }
 
 export function RoomCard({ room, canRemove, onChange, onRemove, onAddService, onRemoveService, onServiceChange }: RoomCardProps) {
+  const hasWallCoating = room.services.some((s) => s.type === 'REVESTIMENTO_GESSO_LISO');
+  // Mesmo padrão do motor de orçamento quando a altura não foi informada
+  const wallHeight = room.wallHeightMeters || DEFAULT_WALL_HEIGHT_METERS;
+
   return (
     <section
       className="bg-white p-6 rounded-2xl shadow-sm border border-neutral-200/80 space-y-4"
@@ -87,6 +91,33 @@ export function RoomCard({ room, canRemove, onChange, onRemove, onAddService, on
             {(room.lengthMeters * room.widthMeters).toFixed(2)} m²
           </span>
         </div>
+        {hasWallCoating && (
+          <>
+            <div>
+              <label htmlFor={`room-wall-height-${room.id}`} className="block text-[11px] font-bold text-neutral-700 uppercase">
+                Altura da Parede (m)
+              </label>
+              <input
+                id={`room-wall-height-${room.id}`}
+                type="number"
+                min="0"
+                max={MAX_WALL_HEIGHT_METERS}
+                step="0.05"
+                value={wallHeight}
+                onChange={(e) => onChange("wallHeightMeters", Number(e.target.value))}
+                className="w-full mt-1 px-3 py-2 rounded-xl border border-neutral-300 text-sm font-semibold text-neutral-900"
+              />
+            </div>
+            <div className="col-span-2 bg-neutral-50 p-2.5 rounded-xl flex flex-col justify-center border border-neutral-200">
+              <span className="text-[10px] text-neutral-600 uppercase font-bold">
+                Área de Parede (revestimento)
+              </span>
+              <span className="text-sm font-black text-brand-charcoal-dark">
+                {(2 * (room.lengthMeters + room.widthMeters) * wallHeight).toFixed(2)} m²
+              </span>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Serviços do Cômodo */}

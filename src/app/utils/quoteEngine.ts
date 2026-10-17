@@ -1,8 +1,10 @@
-    // src/app/utils/quoteEngine.ts
+// src/app/utils/quoteEngine.ts
 import { RoomInput, RoomCalculationResult, MaterialRequirement, ProjectQuote } from '../data/calculatorTypes';
 import { defaultPricingConfig } from '../data/pricingConfig';
 
 const KG_POR_SACO_GESSO = 20;
+export const DEFAULT_WALL_HEIGHT_METERS = 2.8;
+export const MAX_WALL_HEIGHT_METERS = 10;
 
 const clampMetric = (value: number | undefined, max: number, fallback = 0) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
@@ -89,7 +91,7 @@ export function calculateRoomQuote(
       }
 
       case 'REVESTIMENTO_GESSO_LISO': {
-        const wallHeight = clampMetric(room.wallHeightMeters || 2.8, 10, 2.8);
+        const wallHeight = clampMetric(room.wallHeightMeters || DEFAULT_WALL_HEIGHT_METERS, MAX_WALL_HEIGHT_METERS, DEFAULT_WALL_HEIGHT_METERS);
         const wallArea = perimeter * wallHeight;
         laborCost += wallArea * config.laborRates.REVESTIMENTO_GESSO_LISO;
 
