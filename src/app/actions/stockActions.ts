@@ -1,6 +1,6 @@
 'use server';
 
-import { prisma, toNumber } from '../../lib/prisma';
+import { prisma, toNumber, toPlain } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, unauthorized } from '../../lib/auth';
 import { z } from 'zod';
@@ -36,7 +36,7 @@ export async function getStockDataAction() {
       prisma.counterSale.findMany({ orderBy: { createdAt: 'desc' }, take: 15 }),
     ]);
 
-    return { success: true as const, balances, deliveries, sales };
+    return { success: true as const, balances: balances.map(toPlain), deliveries: deliveries.map(toPlain), sales: sales.map(toPlain) };
   } catch (error) {
     console.error('Erro ao buscar estoque:', error);
     return { success: false as const, error: 'Falha ao carregar dados do estoque.' };

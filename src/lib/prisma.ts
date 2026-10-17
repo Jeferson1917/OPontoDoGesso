@@ -5,6 +5,10 @@ import { Prisma, PrismaClient } from '@prisma/client';
 // Atenção: aggregate e $queryRaw não passam por esta extensão — use toNumber() neles.
 export const toNumber = (value: Prisma.Decimal | number | null | undefined) => (value == null ? 0 : Number(value));
 
+// Os resultados da extensão são Proxies (com propriedade de símbolo); o React só aceita objetos
+// simples ao enviar dados do servidor para o navegador. Use ao devolver linhas numa Server Action.
+export const toPlain = <T extends object>(row: T): T => Object.fromEntries(Object.entries(row)) as T;
+
 const decimalFields = <T extends string>(...fields: T[]) =>
   Object.fromEntries(
     fields.map((field) => [

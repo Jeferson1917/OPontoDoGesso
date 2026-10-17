@@ -1,7 +1,7 @@
 // src/app/actions/quoteActions.ts
 'use server';
 
-import { prisma } from '../../lib/prisma';
+import { prisma, toPlain } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { Prisma, QuoteStatus } from '@prisma/client';
 import { getQuoteStockQuantities, legacyStockQuantities, type StockQuantities } from '../utils/stockConsumption';
@@ -37,7 +37,7 @@ export async function saveQuoteAction(input: CreateQuoteInput) {
 
     revalidatePath('/admin');
     revalidatePath('/admin/historico');
-    return { success: true as const, quote: newQuote };
+    return { success: true as const, quote: toPlain(newQuote) };
   } catch (error) {
     console.error('Erro ao salvar orçamento:', error);
     return { success: false as const, error: 'Falha ao salvar o orçamento no banco de dados.' };
@@ -51,7 +51,7 @@ export async function getQuotesAction() {
     const quotes = await prisma.quote.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    return { success: true as const, quotes };
+    return { success: true as const, quotes: quotes.map(toPlain) };
   } catch (error) {
     console.error('Erro ao buscar orçamentos:', error);
     return { success: false as const, error: 'Falha ao carregar lista de orçamentos.' };
