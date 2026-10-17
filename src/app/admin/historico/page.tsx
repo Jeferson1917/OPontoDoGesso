@@ -24,6 +24,7 @@ import { QuoteStatus } from "@prisma/client";
 import { formatBusinessDate } from "../../utils/dates";
 import { summarizePayments } from "../../utils/payments";
 import { PaymentsPanel } from "./PaymentsPanel";
+import { matchesQuoteFilter, type PaymentFilter, type QuoteFilter } from "../../utils/quoteFilters";
 import { ALLOWED_STATUS_TRANSITIONS, QUOTE_STATUS_LABELS } from "../../data/quoteStatus";
 
 type QuotesResult = Awaited<ReturnType<typeof getQuotesAction>>;
@@ -33,6 +34,14 @@ export default function AdminQuotesHistoryPage() {
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<QuoteFilter>({ text: '', status: 'TODOS', payment: 'TODOS' });
+
+  const visibleQuotes = quotes.filter((q) =>
+    matchesQuoteFilter(
+      { ...q, price: q.finalAgreedPrice > 0 ? q.finalAgreedPrice : q.suggestedFinalPrice },
+      filter
+    )
+  );
 
   const applyQuotes = (res: QuotesResult) => {
     if (res.success) {
@@ -150,11 +159,51 @@ export default function AdminQuotesHistoryPage() {
           </button>
         </div>
 
+        {/* Busca e filtros */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="search"
+            aria-label="Buscar por cliente ou telefone"
+            placeholder="Buscar por cliente ou telefone..."
+            value={filter.text}
+            onChange={(e) => setFilter({ ...filter, text: e.target.value })}
+            className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-300 text-sm bg-white focus:outline-none focus:border-brand-red"
+          />
+          <select
+            aria-label="Filtrar por status"
+            value={filter.status}
+            onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+            className="px-3 py-2.5 rounded-xl border border-neutral-300 text-sm bg-white"
+          >
+            <option value="TODOS">Todos os status</option>
+            {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
+              <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrar por pagamento"
+            value={filter.payment}
+            onChange={(e) => setFilter({ ...filter, payment: e.target.value as PaymentFilter })}
+            className="px-3 py-2.5 rounded-xl border border-neutral-300 text-sm bg-white"
+          >
+            <option value="TODOS">Todos os pagamentos</option>
+            <option value="A_RECEBER">A receber</option>
+            <option value="QUITADO">Quitados</option>
+          </select>
+        </div>
+        {quotes.length > 0 && (
+          <p className="text-xs text-neutral-500 -mt-3">
+            {visibleQuotes.length === quotes.length
+              ? `${quotes.length} orçamento${quotes.length > 1 ? 's' : ''}`
+              : `${visibleQuotes.length} de ${quotes.length} orçamentos`}
+          </p>
+        )}
+
         {/* Tabela de Orçamentos */}
         <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
-          {quotes.length === 0 && !loading ? (
+          {visibleQuotes.length === 0 && !loading ? (
             <div className="p-12 text-center text-neutral-400 text-sm">
-              Nenhum orçamento salvo no banco de dados ainda.
+              {quotes.length === 0 ? 'Nenhum orçamento salvo no banco de dados ainda.' : 'Nenhum orçamento encontrado com esses filtros.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -170,7 +219,7 @@ export default function AdminQuotesHistoryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {quotes.map((quote) => {
+                  {visibleQuotes.map((quote) => {
                     const effectivePrice = (quote.finalAgreedPrice && quote.finalAgreedPrice > 0)
                       ? quote.finalAgreedPrice
                       : quote.suggestedFinalPrice;
