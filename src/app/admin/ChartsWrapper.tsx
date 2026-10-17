@@ -21,8 +21,8 @@ export default function ChartsWrapper({ monthlyFinancials }: { monthlyFinancials
   useEffect(() => {
     // Adia a inicialização dos gráficos pesados para quando o navegador estiver ocioso
     if ('requestIdleCallback' in window) {
-      const handle = (window as any).requestIdleCallback(() => setShouldRender(true));
-      return () => (window as any).cancelIdleCallback(handle);
+      const handle = window.requestIdleCallback(() => setShouldRender(true));
+      return () => window.cancelIdleCallback(handle);
     } else {
       const timeout = setTimeout(() => setShouldRender(true), 150);
       return () => clearTimeout(timeout);

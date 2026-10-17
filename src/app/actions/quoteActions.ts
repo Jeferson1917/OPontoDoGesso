@@ -15,7 +15,7 @@ export async function saveQuoteAction(input: CreateQuoteInput) {
   if (!(await getAdminSession())) return unauthorized();
 
   const parsed = parseInput(createQuoteSchema, input);
-  if (!parsed.ok) return { success: false, error: parsed.error };
+  if (!parsed.ok) return { success: false as const, error: parsed.error };
   const data = parsed.data;
 
   try {
@@ -37,10 +37,10 @@ export async function saveQuoteAction(input: CreateQuoteInput) {
 
     revalidatePath('/admin');
     revalidatePath('/admin/historico');
-    return { success: true, quote: toPlain(newQuote) };
+    return { success: true as const, quote: toPlain(newQuote) };
   } catch (error) {
     console.error('Erro ao salvar orçamento:', error);
-    return { success: false, error: 'Falha ao salvar o orçamento no banco de dados.' };
+    return { success: false as const, error: 'Falha ao salvar o orçamento no banco de dados.' };
   }
 }
 
@@ -51,10 +51,10 @@ export async function getQuotesAction() {
     const quotes = await prisma.quote.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    return { success: true, quotes: quotes.map(toPlain) };
+    return { success: true as const, quotes: quotes.map(toPlain) };
   } catch (error) {
     console.error('Erro ao buscar orçamentos:', error);
-    return { success: false, error: 'Falha ao carregar lista de orçamentos.' };
+    return { success: false as const, error: 'Falha ao carregar lista de orçamentos.' };
   }
 }
 
@@ -68,11 +68,11 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
 
   const parsedId = parseInput(idSchema, id);
   const parsedStatus = parseInput(quoteStatusSchema, status);
-  if (!parsedId.ok || !parsedStatus.ok) return { success: false, error: 'Orçamento ou status inválido.' };
+  if (!parsedId.ok || !parsedStatus.ok) return { success: false as const, error: 'Orçamento ou status inválido.' };
 
   try {
     const quote = await prisma.quote.findUnique({ where: { id } });
-    if (!quote) return { success: false, error: 'Orçamento não encontrado.' };
+    if (!quote) return { success: false as const, error: 'Orçamento não encontrado.' };
 
     const isApprovedStatus = status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'CONCLUIDO';
     const shouldDeduct = isApprovedStatus && !quote.stockDeducted;
@@ -148,16 +148,16 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
     revalidatePath('/admin/estoque');
 
     return {
-      success: true,
+      success: true as const,
       deducted: shouldDeduct,
       refunded: shouldRefund,
     };
   } catch (error) {
-    if (error instanceof QuoteStockError) return { success: false, error: error.message };
+    if (error instanceof QuoteStockError) return { success: false as const, error: error.message };
     if (error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2028' || error.code === 'P2034')) {
-      return { success: false, error: 'Outra alteração de estoque estava em andamento. Tente novamente.' };
+      return { success: false as const, error: 'Outra alteração de estoque estava em andamento. Tente novamente.' };
     }
     console.error('Erro ao atualizar status e estoque:', error);
-    return { success: false, error: 'Falha ao atualizar status e movimentar estoque.' };
+    return { success: false as const, error: 'Falha ao atualizar status e movimentar estoque.' };
   }
 }

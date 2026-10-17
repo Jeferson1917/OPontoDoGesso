@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { counterSaleSchema, parseInput, truckDeliverySchema } from '../data/schemas';
 import { Prisma } from '@prisma/client';
 import { splitTruckCosts, weightedAverageCost } from '../utils/truckCost';
+import { defaultStockItems } from '../data/defaultStock';
 
 // Neon tem latência alta; o timeout padrão de 5s das transações é curto
 const STOCK_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
@@ -17,14 +18,6 @@ class SaleError extends Error {}
 
 const isTransactionConflict = (error: unknown) =>
   error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2028' || error.code === 'P2034');
-
-const defaultStockItems = [
-  { itemKey: 'gessoPoKg', name: 'Gesso em Pó Tradicional', unit: 'kg', currentQuantity: 8000, minThreshold: 2500, averageUnitCost: 0.65, counterSalePrice: 1.10 },
-  { itemKey: 'placaGesso60x60', name: 'Placa de Gesso 60x60cm', unit: 'unidades', currentQuantity: 1200, minThreshold: 400, averageUnitCost: 2.80, counterSalePrice: 4.80 },
-  { itemKey: 'gessoColaKg', name: 'Gesso Cola', unit: 'kg', currentQuantity: 300, minThreshold: 80, averageUnitCost: 1.90, counterSalePrice: 3.50 },
-  { itemKey: 'arameGalvanizadoKg', name: 'Arame Galvanizado nº 18', unit: 'kg', currentQuantity: 80, minThreshold: 25, averageUnitCost: 14.00, counterSalePrice: 22.00 },
-  { itemKey: 'sisalKg', name: 'Sisal / Juta', unit: 'kg', currentQuantity: 60, minThreshold: 20, averageUnitCost: 9.50, counterSalePrice: 15.00 },
-];
 
 export async function getStockDataAction() {
   if (!(await getAdminSession())) return unauthorized();
@@ -43,10 +36,10 @@ export async function getStockDataAction() {
       prisma.counterSale.findMany({ orderBy: { createdAt: 'desc' }, take: 15 }),
     ]);
 
-    return { success: true, balances: balances.map(toPlain), deliveries: deliveries.map(toPlain), sales: sales.map(toPlain) };
+    return { success: true as const, balances: balances.map(toPlain), deliveries: deliveries.map(toPlain), sales: sales.map(toPlain) };
   } catch (error) {
     console.error('Erro ao buscar estoque:', error);
-    return { success: false, error: 'Falha ao carregar dados do estoque.' };
+    return { success: false as const, error: 'Falha ao carregar dados do estoque.' };
   }
 }
 
@@ -54,7 +47,7 @@ export async function registerTruckDeliveryAction(input: z.input<typeof truckDel
   if (!(await getAdminSession())) return unauthorized();
 
   const parsed = parseInput(truckDeliverySchema, input);
-  if (!parsed.ok) return { success: false, error: parsed.error };
+  if (!parsed.ok) return { success: false as const, error: parsed.error };
   const data = parsed.data;
 
   try {
@@ -102,11 +95,11 @@ export async function registerTruckDeliveryAction(input: z.input<typeof truckDel
 
     revalidatePath('/admin');
     revalidatePath('/admin/estoque');
-    return { success: true, realCostPerKg };
+    return { success: true as const, realCostPerKg };
   } catch (error) {
     console.error('Erro ao registrar caminhão:', error);
-    if (isTransactionConflict(error)) return { success: false, error: CONFLICT_MESSAGE };
-    return { success: false, error: 'Falha ao registrar carga.' };
+    if (isTransactionConflict(error)) return { success: false as const, error: CONFLICT_MESSAGE };
+    return { success: false as const, error: 'Falha ao registrar carga.' };
   }
 }
 
@@ -114,7 +107,7 @@ export async function registerCounterSaleAction(input: z.input<typeof counterSal
   if (!(await getAdminSession())) return unauthorized();
 
   const parsed = parseInput(counterSaleSchema, input);
-  if (!parsed.ok) return { success: false, error: parsed.error };
+  if (!parsed.ok) return { success: false as const, error: parsed.error };
   const data = parsed.data;
 
   try {
@@ -149,11 +142,11 @@ export async function registerCounterSaleAction(input: z.input<typeof counterSal
 
     revalidatePath('/admin');
     revalidatePath('/admin/estoque');
-    return { success: true };
+    return { success: true as const };
   } catch (error) {
-    if (error instanceof SaleError) return { success: false, error: error.message };
+    if (error instanceof SaleError) return { success: false as const, error: error.message };
     console.error('Erro na venda:', error);
-    if (isTransactionConflict(error)) return { success: false, error: CONFLICT_MESSAGE };
-    return { success: false, error: 'Falha ao concluir venda.' };
+    if (isTransactionConflict(error)) return { success: false as const, error: CONFLICT_MESSAGE };
+    return { success: false as const, error: 'Falha ao concluir venda.' };
   }
 }

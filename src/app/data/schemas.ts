@@ -2,6 +2,7 @@
 // Validação das entradas das Server Actions: elas são endpoints públicos (POST),
 // então nada do que chega do navegador é confiável sem passar por aqui.
 import { z } from 'zod';
+import { STOCK_ITEM_KEYS } from './stockTypes';
 
 z.config(z.locales.ptBR());
 
@@ -10,7 +11,7 @@ const quantity = z.number().finite().min(0).max(1_000_000);
 const optionalText = (max: number) =>
   z.string().trim().max(max).optional().transform((v) => (v ? v : undefined));
 
-export const stockItemKeySchema = z.enum(['gessoPoKg', 'placaGesso60x60', 'gessoColaKg', 'arameGalvanizadoKg', 'sisalKg']);
+export const stockItemKeySchema = z.enum(STOCK_ITEM_KEYS);
 
 const serviceTypeSchema = z.enum([
   'FORRO_PLAQUINHA_60X60',
@@ -31,7 +32,6 @@ const roomInputSchema = z.object({
     .array(
       z.object({
         type: serviceTypeSchema,
-        comTabicaOuNegativo: z.boolean(),
         customLinearMeters: z.number().finite().min(0).max(500).optional(),
       })
     )

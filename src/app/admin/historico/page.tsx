@@ -7,6 +7,7 @@ import {
   updateQuoteStatusAction,
 } from "../../actions/quoteActions";
 import { generateQuotePDF } from "../../utils/pdfGenerator";
+import type { RoomInput } from "../../data/calculatorTypes";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -19,23 +20,29 @@ import {
 } from "lucide-react";
 import { QuoteStatus } from "@prisma/client";
 
+type QuotesResult = Awaited<ReturnType<typeof getQuotesAction>>;
+type QuoteRow = Extract<QuotesResult, { success: true }>["quotes"][number];
+
 export default function AdminQuotesHistoryPage() {
-  const [quotes, setQuotes] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchQuotes = async () => {
-    setLoading(true);
-    const res = await getQuotesAction();
-    if (res.success && res.quotes) {
+  const applyQuotes = (res: QuotesResult) => {
+    if (res.success) {
       setQuotes(res.quotes);
     } else {
-      toast.error("Erro ao buscar histórico de orçamentos.");
+      toast.error(res.error || "Erro ao buscar histórico de orçamentos.");
     }
     setLoading(false);
   };
 
+  const fetchQuotes = async () => {
+    setLoading(true);
+    applyQuotes(await getQuotesAction());
+  };
+
   useEffect(() => {
-    fetchQuotes();
+    getQuotesAction().then(applyQuotes);
   }, []);
 
   const handleStatusChange = async (id: string, newStatus: QuoteStatus) => {
@@ -212,7 +219,7 @@ export default function AdminQuotesHistoryPage() {
                               generateQuotePDF({
                                 clientName: quote.clientName,
                                 clientPhone: quote.clientPhone || "",
-                                rooms: quote.roomsData,
+                                rooms: quote.roomsData as unknown as RoomInput[], // validado pelo zod ao salvar
                                 quote: {
                                   totalAreaM2: quote.totalAreaM2,
                                   suggestedFinalPrice: quote.suggestedFinalPrice,

@@ -1,40 +1,16 @@
 // src/app/data/stockTypes.ts
 
-export type StockItemKey = 
-  | 'gessoPoKg' 
-  | 'placaGesso60x60' 
-  | 'gessoColaKg' 
-  | 'arameGalvanizadoKg' 
-  | 'sisalKg';
+export const STOCK_ITEM_KEYS = ['gessoPoKg', 'placaGesso60x60', 'gessoColaKg', 'arameGalvanizadoKg', 'sisalKg'] as const;
 
-export interface StockItem {
-  id: StockItemKey;
-  name: string;
-  unit: string;
-  currentQuantity: number;
-  minThreshold: number; // Ponto de reposição / Pedir caminhão
-  averageUnitCost: number; // Custo de aquisição (com frete e descarga)
-  counterSalePrice: number; // Preço de venda direta no balcão pro gesseiro
-}
+export type StockItemKey = (typeof STOCK_ITEM_KEYS)[number];
 
-export interface TruckDeliveryInput {
-  date: string;
-  supplier: string; // Ex: Polo do Araripe / Gipsita
-  tonsGessoPo: number; // Ex: 10 ou 14 toneladas
-  platesQuantity: number; // Quantidade de plaquinhas no caminhão (se houver)
-  gessoCostTotal: number; // Valor das notas dos materiais
-  freightCost: number; // Valor pago ao caminhoneiro/transportadora
-  unloadingLaborCost: number; // Diária dos chapas para descarregar
-  notes?: string;
-}
+// Rótulo curto (com unidade) usado em listas, selects e histórico
+export const STOCK_ITEM_LABELS: Record<StockItemKey, string> = {
+  gessoPoKg: 'Gesso em Pó (kg)',
+  placaGesso60x60: 'Placa de Gesso 60x60cm (un)',
+  gessoColaKg: 'Gesso Cola (kg)',
+  arameGalvanizadoKg: 'Arame Galvanizado nº 18 (kg)',
+  sisalKg: 'Sisal / Juta (kg)',
+};
 
-export interface StockMovement {
-  id: string;
-  date: string;
-  type: 'ENTRADA_CAMINHAO' | 'VENDA_BALCAO_GESSEIRO' | 'CONSUMO_OBRA' | 'AJUSTE_PERDA';
-  itemId: StockItemKey;
-  quantity: number;
-  unitPriceOrCost: number;
-  totalValue: number;
-  description: string;
-}
+export const stockItemLabel = (key: string) => STOCK_ITEM_LABELS[key as StockItemKey] ?? key;

@@ -1,4 +1,4 @@
-import { ArrowUpRight, CheckCircle2, Sparkles, Building2 } from 'lucide-react';
+import { ArrowUpRight, Sparkles, Building2 } from 'lucide-react';
 import { services } from '../data/offerings';
 import { companyData } from '../data/company';
 

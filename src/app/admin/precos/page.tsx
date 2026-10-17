@@ -14,8 +14,7 @@ import {
   Pickaxe,
   HardHat,
   TrendingUp,
-  Info,
-  Layers
+  Info
 } from 'lucide-react';
 
 type MaterialKey = keyof typeof defaultPricingConfig.materialCosts;
