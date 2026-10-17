@@ -1,6 +1,6 @@
 import Image from 'next/image';
 import { historyData } from '../data/gallery';
-import { CheckCircle2, Award, Sparkles, MapPin } from 'lucide-react';
+import { CheckCircle2, Sparkles, MapPin } from 'lucide-react';
 
 export function About() {
   return (

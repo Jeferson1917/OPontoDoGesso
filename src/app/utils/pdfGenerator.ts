@@ -14,7 +14,6 @@ interface PDFQuoteOptions {
     totalAreaM2: number;
     suggestedFinalPrice: number;
     finalAgreedPrice?: number;
-    [key: string]: any;
   };
   notes?: string;
 }
@@ -197,7 +196,7 @@ export function generateQuotePDF({
     },
   });
 
-  const tableEnd = (doc as any).lastAutoTable.finalY + 6;
+  const tableEnd = (doc as jsPDF & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 6;
 
   // 4. QUADRO DE VALOR FINAL CONSOLIDADO (Reflete valor negociado se existir)
   const finalPriceToDisplay = (quote.finalAgreedPrice !== undefined && quote.finalAgreedPrice > 0)

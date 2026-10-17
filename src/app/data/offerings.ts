@@ -1,13 +1,11 @@
 // src/data/offerings.ts
 import { 
   Sparkles, 
-  Layers, 
   SquareAsterisk, 
   Maximize2, 
   Package, 
   Wrench, 
-  Hammer, 
-  Boxes 
+  Hammer
 } from 'lucide-react';
 
 export const services = [

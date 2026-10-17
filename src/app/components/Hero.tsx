@@ -6,8 +6,7 @@ import {
   ShoppingCart, 
   ArrowRight, 
   Sparkles, 
-  CheckCircle2,
-  Layers
+  CheckCircle2
 } from 'lucide-react';
 import { companyData } from '../data/company';
 
