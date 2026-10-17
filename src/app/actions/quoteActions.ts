@@ -51,8 +51,9 @@ export async function getQuotesAction() {
   try {
     const quotes = await prisma.quote.findMany({
       orderBy: { createdAt: 'desc' },
+      include: { payments: { orderBy: { paidAt: 'asc' } } },
     });
-    return { success: true as const, quotes: quotes.map(toPlain) };
+    return { success: true as const, quotes: quotes.map((q) => ({ ...toPlain(q), payments: q.payments.map(toPlain) })) };
   } catch (error) {
     console.error('Erro ao buscar orçamentos:', error);
     return { success: false as const, error: 'Falha ao carregar lista de orçamentos.' };
@@ -174,10 +175,10 @@ export async function deleteQuoteAction(id: string) {
 
   try {
     const { count } = await prisma.quote.deleteMany({
-      where: { id: parsedId.data, stockDeducted: false, status: { in: ['PENDENTE', 'CANCELADO'] } },
+      where: { id: parsedId.data, stockDeducted: false, status: { in: ['PENDENTE', 'CANCELADO'] }, payments: { none: {} } },
     });
     if (count === 0) {
-      return { success: false as const, error: 'Só é possível excluir orçamentos pendentes ou cancelados, sem material baixado do estoque.' };
+      return { success: false as const, error: 'Só é possível excluir orçamentos pendentes ou cancelados, sem material baixado do estoque e sem pagamentos lançados.' };
     }
 
     revalidatePath('/admin');

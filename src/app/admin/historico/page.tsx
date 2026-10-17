@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import Link from "next/link";
 import {
   getQuotesAction,
@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { QuoteStatus } from "@prisma/client";
 import { formatBusinessDate } from "../../utils/dates";
+import { summarizePayments } from "../../utils/payments";
+import { PaymentsPanel } from "./PaymentsPanel";
 import { ALLOWED_STATUS_TRANSITIONS, QUOTE_STATUS_LABELS } from "../../data/quoteStatus";
 
 type QuotesResult = Awaited<ReturnType<typeof getQuotesAction>>;
@@ -30,6 +32,7 @@ type QuoteRow = Extract<QuotesResult, { success: true }>["quotes"][number];
 export default function AdminQuotesHistoryPage() {
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const applyQuotes = (res: QuotesResult) => {
     if (res.success) {
@@ -172,11 +175,12 @@ export default function AdminQuotesHistoryPage() {
                       ? quote.finalAgreedPrice
                       : quote.suggestedFinalPrice;
 
+                    const payment = summarizePayments(effectivePrice, quote.payments);
+                    const expanded = expandedId === quote.id;
+
                     return (
-                      <tr
-                        key={quote.id}
-                        className="hover:bg-neutral-50/60 transition-colors"
-                      >
+                      <Fragment key={quote.id}>
+                      <tr className="hover:bg-neutral-50/60 transition-colors">
                         <td className="p-4 font-medium text-neutral-500">
                           {formatBusinessDate(quote.createdAt)}
                         </td>
@@ -206,6 +210,21 @@ export default function AdminQuotesHistoryPage() {
                               })}
                             </span>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(expanded ? null : quote.id)}
+                            className={`mt-1 block text-[10px] font-bold hover:underline ${
+                              payment.status === 'QUITADO' ? 'text-emerald-700' : payment.status === 'PARCIAL' ? 'text-amber-700' : 'text-neutral-500'
+                            }`}
+                            aria-expanded={expanded}
+                          >
+                            {payment.status === 'QUITADO'
+                              ? 'Quitado'
+                              : payment.status === 'PARCIAL'
+                                ? `Pago ${payment.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · falta ${payment.remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                                : 'Nada recebido'}{' '}
+                            {expanded ? '▲' : '▼'}
+                          </button>
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
@@ -262,6 +281,21 @@ export default function AdminQuotesHistoryPage() {
                           )}
                         </td>
                       </tr>
+                      {expanded && (
+                        <tr>
+                          <td colSpan={6} className="bg-neutral-50 px-4 py-4 border-t border-neutral-200">
+                            <PaymentsPanel
+                              key={`${quote.id}-${payment.paid}`} // recomeça o formulário com o novo "falta"
+                              quoteId={quote.id}
+                              total={effectivePrice}
+                              cancelled={quote.status === 'CANCELADO'}
+                              payments={quote.payments}
+                              onChanged={fetchQuotes}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </tbody>

@@ -20,9 +20,11 @@ import {
   Clock,
   CheckCircle2,
   PlayCircle,
-  ShoppingBag
+  ShoppingBag,
+  Wallet
 } from 'lucide-react';
 import { formatBusinessDate } from '../utils/dates';
+import { receivedThisMonth, totalReceivable } from '../utils/payments';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,10 +35,10 @@ export default async function AdminDashboardPage() {
 
   // Totais dos cards usam o histórico todo, mas só com os campos necessários;
   // linhas completas (snapshot, vendas, cargas) só da janela dos gráficos
-  const [quotes, chartQuotes, stockBalances, salesTotals, chartSales, truckDeliveries] = await Promise.all([
+  const [quotes, chartQuotes, stockBalances, salesTotals, chartSales, truckDeliveries, recentPayments] = await Promise.all([
     prisma.quote.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, clientName: true, clientPhone: true, totalAreaM2: true, status: true, suggestedFinalPrice: true, finalAgreedPrice: true },
+      select: { id: true, clientName: true, clientPhone: true, totalAreaM2: true, status: true, suggestedFinalPrice: true, finalAgreedPrice: true, payments: { select: { amount: true } } },
     }),
     prisma.quote.findMany({
       where: {
@@ -52,6 +54,7 @@ export default async function AdminDashboardPage() {
       select: { createdAt: true, itemKey: true, quantity: true, totalValue: true, estimatedProfit: true },
     }),
     prisma.truckDelivery.findMany({ where: { date: { gte: since } }, select: { date: true, tonsGessoPo: true } }),
+    prisma.payment.findMany({ where: { paidAt: { gte: since } }, select: { amount: true, paidAt: true } }),
   ]);
 
   // Propostas em aberto ou fechadas; canceladas não entram no valor
@@ -70,6 +73,9 @@ export default async function AdminDashboardPage() {
   const totalPlacas = placaItem ? placaItem.currentQuantity : 0;
   const isGessoLow = gessoItem ? gessoItem.currentQuantity <= gessoItem.minThreshold : false;
   const lowStockItems = stockBalances.filter((s) => s.currentQuantity <= s.minThreshold);
+
+  const receivedMonth = receivedThisMonth(recentPayments);
+  const receivable = totalReceivable(quotes.map((q) => ({ status: q.status, price: getEffectivePrice(q), payments: q.payments })));
 
   const monthlyFinancials = buildMonthlyFinancials(chartQuotes, chartSales, truckDeliveries);
 
@@ -219,6 +225,33 @@ export default async function AdminDashboardPage() {
               <p className="text-xs text-neutral-500 mt-1 font-medium">{counterSalesCount} retiradas avulsas</p>
             </div>
           </div>
+        </section>
+
+        {/* RECEBIMENTOS */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="bg-white p-6 rounded-2xl border border-neutral-200/80 shadow-sm flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">Recebido este mês</span>
+              <p className="text-2xl font-black text-emerald-600 mt-1">
+                {receivedMonth.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-neutral-500 mt-1 font-medium">Pagamentos lançados nas obras</p>
+            </div>
+            <div className="p-2 rounded-xl bg-emerald-50 text-emerald-600"><Wallet className="w-5 h-5" /></div>
+          </div>
+          <Link
+            href="/admin/historico"
+            className="bg-white p-6 rounded-2xl border border-neutral-200/80 shadow-sm flex items-center justify-between hover:border-brand-red transition-colors"
+          >
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-neutral-400">A receber</span>
+              <p className="text-2xl font-black text-amber-600 mt-1">
+                {receivable.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+              </p>
+              <p className="text-xs text-neutral-500 mt-1 font-medium">Obras aprovadas, em execução ou concluídas ainda não quitadas</p>
+            </div>
+            <div className="p-2 rounded-xl bg-amber-50 text-amber-600"><Clock className="w-5 h-5" /></div>
+          </Link>
         </section>
 
         {/* SEÇÃO PRINCIPAL: GRÁFICO DIFERIDO + NAVEGAÇÃO RÁPIDA */}

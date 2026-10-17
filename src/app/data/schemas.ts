@@ -3,6 +3,8 @@
 // então nada do que chega do navegador é confiável sem passar por aqui.
 import { z } from 'zod';
 import { STOCK_ITEM_KEYS } from './stockTypes';
+import { PAYMENT_METHODS } from '../utils/payments';
+import { businessTodayInput } from '../utils/dates';
 
 z.config(z.locales.ptBR());
 
@@ -108,4 +110,15 @@ export const stockAdjustmentSchema = z.object({
   itemKey: stockItemKeySchema,
   countedQuantity: z.number().finite().min(0, 'A quantidade contada não pode ser negativa.').max(10_000_000),
   reason: z.string().trim().min(3, 'Informe o motivo do ajuste.').max(300),
+});
+
+export const paymentSchema = z.object({
+  quoteId: idSchema,
+  amount: z.number().finite().positive('Informe um valor maior que zero.').max(10_000_000),
+  method: z.enum(PAYMENT_METHODS),
+  paidAt: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida.')
+    .refine((d) => d <= businessTodayInput(), 'A data do pagamento não pode ser no futuro.'),
+  notes: optionalText(300),
 });
