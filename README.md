@@ -73,6 +73,9 @@ Sempre confira o passo 1 antes: o `db push` aplica qualquer diferença entre o s
 | `truck_deliveries` | Cargas de caminhão recebidas |
 | `counter_sales` | Vendas no balcão |
 | `pricing_configs` | Tabela de preços (linha única `global_config`) |
+| `payments` | Pagamentos recebidos de cada obra |
+| `stock_adjustments` | Ajustes de inventário (antes, depois, motivo) |
+| `revoked_sessions` | Tokens de sessão revogados no logout |
 
 Valores em dinheiro são `DECIMAL` no banco; a extensão em [`src/lib/prisma.ts`](src/lib/prisma.ts) os converte para `number` no código. Em `aggregate` e `$queryRaw` use `toNumber()`, e ao devolver linhas do banco numa Server Action use `toPlain()`.
 
@@ -80,15 +83,15 @@ Valores em dinheiro são `DECIMAL` no banco; a extensão em [`src/lib/prisma.ts`
 
 ## Painel administrativo (`/admin`)
 
-Todas as páginas e Server Actions do painel verificam a sessão (`src/lib/auth.ts`); o login bloqueia o IP por 15 minutos após 5 tentativas erradas.
+Todas as páginas e Server Actions do painel verificam a sessão (`src/lib/auth.ts`); o login bloqueia o IP por 15 minutos após 5 tentativas erradas. O **logout revoga o token no servidor** (tabela `revoked_sessions`) e **trocar `ADMIN_PASSWORD` derruba todas as sessões abertas**.
 
 | Página | O que faz |
 |---|---|
 | **Dashboard** `/admin` | Faturamento, propostas, estoque de gesso, vendas no balcão e gráficos dos últimos 6 meses |
 | **Orçamento** `/admin/orcamento` | Monta o orçamento por cômodo e serviço, permite negociar o valor, salva e gera PDF |
-| **Histórico** `/admin/historico` | Lista os orçamentos e muda o status da obra |
-| **Estoque** `/admin/estoque` | Saldo dos itens, entrada de caminhão e venda no balcão |
-| **Balcão** `/admin/balcao` | Histórico das vendas no balcão |
+| **Histórico** `/admin/historico` | Lista, busca e filtra os orçamentos; muda o status da obra; lança pagamentos; reimprime o PDF; exclui orçamento pendente/cancelado |
+| **Estoque** `/admin/estoque` | Saldo dos itens, entrada de caminhão (com exclusão de carga lançada errada), venda no balcão e **ajuste de inventário** |
+| **Balcão** `/admin/balcao` | Histórico das vendas no balcão (com exclusão de venda lançada errada) |
 | **Preços** `/admin/precos` | Mão de obra, custo dos insumos, margem, quebra e preço mínimo |
 
 ### Regras de negócio
@@ -98,7 +101,12 @@ Todas as páginas e Server Actions do painel verificam a sessão (`src/lib/auth.
 - **Venda no balcão**: só conclui se houver saldo; vendas simultâneas não deixam o estoque negativo.
 - **Carga de caminhão**: frete e descarga são rateados entre gesso e placas pelo valor das notas; o custo médio de cada item é atualizado por média ponderada.
 - **Tabela de preços**: fica no banco (igual em todos os dispositivos). A tela mostra ao lado de cada insumo o custo médio real do estoque, com opção de usá-lo.
-- **Dashboard**: lucro das obras = valor fechado − (mão de obra + materiais do orçamento); a receita entra no mês da aprovação.
+- **Status das obras**: Concluído só pode ser reaberto (volta para Em Obra, sem mexer no estoque); Em Obra não volta para Pendente. Regras em [`quoteStatus.ts`](src/app/data/quoteStatus.ts).
+- **Pagamentos**: cada obra registra sinal/parcelas (valor, forma, data); não aceita valor acima do que falta nem obra cancelada. Orçamento com pagamento não pode ser excluído.
+- **Correções de estoque**: excluir uma venda devolve o material; excluir uma carga retira a quantidade e desfaz o efeito no custo médio (recusado se parte já saiu); o ajuste de inventário fixa o saldo contado e guarda o histórico (`stock_adjustments`).
+- **PDF**: mostra a metragem cobrada (parede no revestimento, metros lineares em sanca/moldura/cortineiro), os contatos da empresa e, ao reimprimir, a data original do orçamento.
+- **Dashboard**: lucro das obras = valor fechado − (mão de obra + materiais do orçamento); a receita entra no mês da aprovação; cards de recebido no mês e a receber; aviso de estoque baixo para todos os itens.
+- **Datas**: sempre no fuso de Aracaju (`America/Maceio`), mesmo com o servidor em UTC ([`dates.ts`](src/app/utils/dates.ts)).
 
 ---
 
