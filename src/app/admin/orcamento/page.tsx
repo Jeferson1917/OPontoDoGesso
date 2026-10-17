@@ -13,7 +13,7 @@ import { toast } from "sonner";
 import { LogOut, Settings, Package, Plus, Calculator } from "lucide-react";
 import { RoomCard } from "./_components/RoomCard";
 import { QuoteSummary } from "./_components/QuoteSummary";
-import { MAX_DIMENSION_METERS, MAX_LINEAR_METERS } from "./_components/limits";
+import { MAX_DIMENSION_METERS, MAX_LINEAR_METERS, MAX_WALL_HEIGHT_METERS } from "./_components/limits";
 
 const formatPhoneValue = (value: string) => {
   const digits = value.replace(/\D/g, "").slice(0, 11);
@@ -76,15 +76,16 @@ export default function AdminBudgetPage() {
     setRooms(
       rooms.map((room) => {
         if (room.id !== id) return room;
-        if (
-          field === "lengthMeters" ||
-          field === "widthMeters" ||
-          field === "wallHeightMeters"
-        ) {
-          const numericValue = Number(value);
+        if (field === "lengthMeters" || field === "widthMeters") {
           return {
             ...room,
-            [field]: clampMetricValue(numericValue, MAX_DIMENSION_METERS, 0),
+            [field]: clampMetricValue(Number(value), MAX_DIMENSION_METERS, 0),
+          };
+        }
+        if (field === "wallHeightMeters") {
+          return {
+            ...room,
+            wallHeightMeters: clampMetricValue(Number(value), MAX_WALL_HEIGHT_METERS, 0),
           };
         }
         return { ...room, [field]: value };
