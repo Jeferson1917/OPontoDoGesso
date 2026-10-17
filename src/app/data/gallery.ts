@@ -1,5 +1,14 @@
 // src/app/data/gallery.ts
-export const galleryItems = [
+// Para mostrar uma foto: coloque o arquivo em public/images/ com o nome indicado em `image`
+// (ex.: public/images/galeria-1.jpg). Enquanto o arquivo não existir, o card mostra "Foto em Atualização".
+export interface GalleryItem {
+  title: string;
+  category: string;
+  description: string;
+  image: string | null;
+}
+
+export const galleryItems: GalleryItem[] = [
   {
     title: 'Sanca Invertida com LED',
     category: 'Sancas & Iluminação',
