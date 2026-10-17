@@ -50,3 +50,10 @@ export function weightedAverageCost(currentQty: number, currentAvg: number, adde
   if (totalQty <= 0) return currentAvg;
   return (Math.max(currentQty, 0) * currentAvg + addedCost) / totalQty;
 }
+
+// Inverso de weightedAverageCost: custo médio depois de retirar uma entrada (ex.: excluir uma carga lançada errada)
+export function removeFromAverageCost(currentQty: number, currentAvg: number, removedQty: number, removedCost: number): number {
+  const remainingQty = currentQty - removedQty;
+  if (remainingQty <= 0 || removedCost <= 0) return currentAvg;
+  return Math.max((currentQty * currentAvg - removedCost) / remainingQty, 0);
+}

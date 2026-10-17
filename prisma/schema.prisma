@@ -103,3 +103,16 @@ model RevokedSession {
 
   @@map("revoked_sessions")
 }
+
+// Ajustes de inventário (contagem física, perda, quebra): histórico de cada correção de saldo
+model StockAdjustment {
+  id               String   @id @default(cuid())
+  itemKey          String
+  previousQuantity Float
+  newQuantity      Float
+  difference       Float
+  reason           String
+  createdAt        DateTime @default(now())
+
+  @@map("stock_adjustments")
+}

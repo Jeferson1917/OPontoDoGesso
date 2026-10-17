@@ -6,9 +6,13 @@ import {
   getStockDataAction,
   registerTruckDeliveryAction,
   registerCounterSaleAction,
+  deleteTruckDeliveryAction,
+  adjustStockAction,
 } from '../../actions/stockActions';
 import { toast } from 'sonner';
-import { Truck, ArrowLeft, ShoppingCart, Layers } from 'lucide-react';
+import { Truck, ArrowLeft, ShoppingCart, Layers, ClipboardCheck } from 'lucide-react';
+import { InventoryAdjustment } from './_components/InventoryAdjustment';
+import type { StockItemKey } from '../../data/stockTypes';
 import { StockOverview } from './_components/StockOverview';
 import { TruckDeliveryForm } from './_components/TruckDeliveryForm';
 import { CounterSaleForm } from './_components/CounterSaleForm';
@@ -18,13 +22,15 @@ import {
   type StockBalanceRow,
   type StockDataResult,
   type TruckDeliveryRow,
+  type StockAdjustmentRow,
 } from './_components/types';
 
 export default function AdminStockPage() {
   const [balances, setBalances] = useState<StockBalanceRow[]>([]);
   const [deliveries, setDeliveries] = useState<TruckDeliveryRow[]>([]);
+  const [adjustments, setAdjustments] = useState<StockAdjustmentRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'PANORAMA' | 'CAMINHAO' | 'BALCAO'>('PANORAMA');
+  const [activeTab, setActiveTab] = useState<'PANORAMA' | 'CAMINHAO' | 'BALCAO' | 'INVENTARIO'>('PANORAMA');
 
   const [truckForm, setTruckForm] = useState(initialTruckForm);
   const [saleForm, setSaleForm] = useState(initialSaleForm);
@@ -33,6 +39,7 @@ export default function AdminStockPage() {
     if (res.success) {
       setBalances(res.balances);
       setDeliveries(res.deliveries);
+      setAdjustments(res.adjustments);
     } else {
       toast.error(res.error || 'Erro ao carregar dados do estoque.');
     }
@@ -72,6 +79,34 @@ export default function AdminStockPage() {
     } else {
       toast.error(res.error || 'Erro na venda.', { id: toastId });
     }
+  };
+
+  const handleDeleteDelivery = async (delivery: TruckDeliveryRow) => {
+    const what = [
+      delivery.tonsGessoPo > 0 ? `${delivery.tonsGessoPo} t de gesso` : null,
+      delivery.platesQuantity > 0 ? `${delivery.platesQuantity} placas` : null,
+    ].filter(Boolean).join(' e ');
+    if (!confirm(`Excluir a carga de ${delivery.supplier} (${what})? O saldo e o custo médio voltam ao que eram antes dela.`)) return;
+    const toastId = toast.loading('Excluindo carga...');
+    const res = await deleteTruckDeliveryAction(delivery.id);
+    if (res.success) {
+      toast.success('Carga excluída e estoque corrigido.', { id: toastId });
+      fetchData();
+    } else {
+      toast.error(res.error, { id: toastId });
+    }
+  };
+
+  const handleAdjustStock = async (data: { itemKey: StockItemKey; countedQuantity: number; reason: string }) => {
+    const toastId = toast.loading('Registrando ajuste...');
+    const res = await adjustStockAction(data);
+    if (res.success) {
+      toast.success('Ajuste registrado. Saldo atualizado.', { id: toastId });
+      fetchData();
+      return true;
+    }
+    toast.error(res.error, { id: toastId });
+    return false;
   };
 
 
@@ -130,6 +165,17 @@ export default function AdminStockPage() {
             >
               <ShoppingCart className="w-4 h-4 inline mr-1" /> Venda Balcão
             </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('INVENTARIO')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'INVENTARIO'
+                  ? 'bg-brand-charcoal-dark text-white'
+                  : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+              }`}
+            >
+              <ClipboardCheck className="w-4 h-4 inline mr-1" /> Inventário
+            </button>
           </div>
         </header>
 
@@ -137,7 +183,18 @@ export default function AdminStockPage() {
         <div className="min-h-[420px]">
           {/* ABA 1: PANORAMA GERAL */}
           {activeTab === 'PANORAMA' && (
-            <StockOverview balances={balances} deliveries={deliveries} loading={loading} onRefresh={fetchData} />
+            <StockOverview
+              balances={balances}
+              deliveries={deliveries}
+              loading={loading}
+              onRefresh={fetchData}
+              onDeleteDelivery={handleDeleteDelivery}
+            />
+          )}
+
+          {/* ABA 4: AJUSTE DE INVENTÁRIO */}
+          {activeTab === 'INVENTARIO' && (
+            <InventoryAdjustment balances={balances} adjustments={adjustments} onSubmit={handleAdjustStock} />
           )}
 
           {/* ABA 2: ENTRADA DE CAMINHÃO */}
