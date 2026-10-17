@@ -4,6 +4,7 @@
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { QuoteStatus } from '@prisma/client';
+import { getAdminSession, unauthorized } from '../../lib/auth';
 
 export interface CreateQuoteInput {
   clientName: string;
@@ -18,6 +19,8 @@ export interface CreateQuoteInput {
 }
 
 export async function saveQuoteAction(data: CreateQuoteInput) {
+  if (!(await getAdminSession())) return unauthorized();
+
   try {
     const newQuote = await prisma.quote.create({
       data: {
@@ -45,6 +48,8 @@ export async function saveQuoteAction(data: CreateQuoteInput) {
 }
 
 export async function getQuotesAction() {
+  if (!(await getAdminSession())) return unauthorized();
+
   try {
     const quotes = await prisma.quote.findMany({
       orderBy: { createdAt: 'desc' },
@@ -124,6 +129,8 @@ function calculateMaterialsFromRoomsOrSnapshot(roomsData: any, snapshot: any) {
 }
 
 export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
+  if (!(await getAdminSession())) return unauthorized();
+
   try {
     const quote = (await prisma.quote.findUnique({ where: { id } })) as any;
     if (!quote) return { success: false, error: 'Orçamento não encontrado.' };
