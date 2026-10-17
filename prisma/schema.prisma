@@ -96,3 +96,10 @@ model StockBalance {
 
   @@map("stock_balances")
 }
+// Tokens de sessão revogados no logout (mantidos só até expirarem)
+model RevokedSession {
+  jti       String   @id
+  expiresAt DateTime
+
+  @@map("revoked_sessions")
+}
