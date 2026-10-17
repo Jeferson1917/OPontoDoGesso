@@ -2,6 +2,8 @@
 import { RoomInput, RoomCalculationResult, MaterialRequirement, ProjectQuote } from '../data/calculatorTypes';
 import { defaultPricingConfig } from '../data/pricingConfig';
 
+const KG_POR_SACO_GESSO = 20;
+
 const clampMetric = (value: number | undefined, max: number, fallback = 0) => {
   if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
   return Math.min(Math.max(value, 0), max);
@@ -32,6 +34,8 @@ export function calculateRoomQuote(
           quantity: placasQtd,
           unitCost: config.materialCosts.placaGesso60x60,
           totalCost: placasQtd * config.materialCosts.placaGesso60x60,
+          stockItemKey: 'placaGesso60x60',
+          stockQuantity: placasQtd,
         });
 
         // Gesso em pó para chumbamento e rejunte (1 saco 20kg a cada 7m²)
@@ -42,6 +46,8 @@ export function calculateRoomQuote(
           quantity: sacosGesso,
           unitCost: config.materialCosts.gessoPo20kg,
           totalCost: sacosGesso * config.materialCosts.gessoPo20kg,
+          stockItemKey: 'gessoPoKg',
+          stockQuantity: sacosGesso * KG_POR_SACO_GESSO,
         });
 
         // Arame Galvanizado nº 18 (~0.12 kg por m²)
@@ -52,6 +58,8 @@ export function calculateRoomQuote(
           quantity: arameKg,
           unitCost: config.materialCosts.arameGalvanizado18Kg,
           totalCost: arameKg * config.materialCosts.arameGalvanizado18Kg,
+          stockItemKey: 'arameGalvanizadoKg',
+          stockQuantity: arameKg,
         });
 
         // Sisal / Estopa para chumbamento (~0.10 kg por m²)
@@ -62,6 +70,8 @@ export function calculateRoomQuote(
           quantity: Math.max(1, sisalKg),
           unitCost: config.materialCosts.sisalJutaKg,
           totalCost: Math.max(1, sisalKg) * config.materialCosts.sisalJutaKg,
+          stockItemKey: 'sisalKg',
+          stockQuantity: Math.max(1, sisalKg),
         });
 
         // Gesso Cola para emendas/acabamento (~0.3 kg por m²)
@@ -72,6 +82,8 @@ export function calculateRoomQuote(
           quantity: Math.max(1, gessoColaKg),
           unitCost: config.materialCosts.gessoColaKg,
           totalCost: Math.max(1, gessoColaKg) * config.materialCosts.gessoColaKg,
+          stockItemKey: 'gessoColaKg',
+          stockQuantity: Math.max(1, gessoColaKg),
         });
         break;
       }
@@ -89,6 +101,8 @@ export function calculateRoomQuote(
           quantity: sacosParede,
           unitCost: config.materialCosts.gessoPo20kg,
           totalCost: sacosParede * config.materialCosts.gessoPo20kg,
+          stockItemKey: 'gessoPoKg',
+          stockQuantity: sacosParede * KG_POR_SACO_GESSO,
         });
         break;
       }
@@ -110,6 +124,8 @@ export function calculateRoomQuote(
           quantity: Math.max(1, sacosSanca),
           unitCost: config.materialCosts.gessoPo20kg,
           totalCost: Math.max(1, sacosSanca) * config.materialCosts.gessoPo20kg,
+          stockItemKey: 'gessoPoKg',
+          stockQuantity: Math.max(1, sacosSanca) * KG_POR_SACO_GESSO,
         });
         break;
       }
@@ -137,6 +153,8 @@ export function calculateRoomQuote(
           quantity: Math.max(1, gessoColaLinear),
           unitCost: config.materialCosts.gessoColaKg,
           totalCost: Math.max(1, gessoColaLinear) * config.materialCosts.gessoColaKg,
+          stockItemKey: 'gessoColaKg',
+          stockQuantity: Math.max(1, gessoColaLinear),
         });
         break;
       }

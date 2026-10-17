@@ -17,6 +17,7 @@ model Quote {
   finalAgreedPrice    Float        @default(0.0) 
   discountApplied     Float        @default(0.0)
   stockDeducted       Boolean      @default(false)
+  stockMovement       Json?        // Quantidades baixadas do estoque por itemKey (usado no estorno)
   status              QuoteStatus  @default(PENDENTE)
   roomsData           Json         
   materialsSnapshot   Json         

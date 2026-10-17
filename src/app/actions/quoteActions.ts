@@ -3,7 +3,8 @@
 
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
-import { QuoteStatus } from '@prisma/client';
+import { Prisma, QuoteStatus } from '@prisma/client';
+import { getQuoteStockQuantities, legacyStockQuantities, type StockQuantities } from '../utils/stockConsumption';
 import { getAdminSession, unauthorized } from '../../lib/auth';
 
 export interface CreateQuoteInput {
@@ -61,78 +62,11 @@ export async function getQuotesAction() {
   }
 }
 
-// Extrator resiliente: calcula diretamente a partir das metragens se o snapshot estiver vazio
-function calculateMaterialsFromRoomsOrSnapshot(roomsData: any, snapshot: any) {
-  const totals: Record<string, number> = {
-    gessoPoKg: 0,
-    placaGesso60x60: 0,
-    gessoColaKg: 0,
-    arameGalvanizadoKg: 0,
-    sisalKg: 0,
-  };
-
-  const addValues = (obj: any) => {
-    if (!obj || typeof obj !== 'object') return;
-    if (obj.gessoPoKg) totals.gessoPoKg += Number(obj.gessoPoKg) || 0;
-    if (obj.placasGesso60x60) totals.placaGesso60x60 += Number(obj.placasGesso60x60) || 0;
-    if (obj.placaGesso60x60) totals.placaGesso60x60 += Number(obj.placaGesso60x60) || 0;
-    if (obj.gessoColaKg) totals.gessoColaKg += Number(obj.gessoColaKg) || 0;
-    if (obj.arameGalvanizadoKg) totals.arameGalvanizadoKg += Number(obj.arameGalvanizadoKg) || 0;
-    if (obj.sisalKg) totals.sisalKg += Number(obj.sisalKg) || 0;
-  };
-
-  // 1. Tenta extrair do snapshot
-  if (snapshot) {
-    if (snapshot.totalMaterials) {
-      addValues(snapshot.totalMaterials);
-    } else if (Array.isArray(snapshot)) {
-      for (const item of snapshot) {
-        addValues(item.materials || item);
-      }
-    } else if (snapshot.rooms && Array.isArray(snapshot.rooms)) {
-      for (const item of snapshot.rooms) {
-        addValues(item.materials || item);
-      }
-    } else {
-      addValues(snapshot);
-    }
-  }
-
-  // 2. Fallback: Se o snapshot estava vazio ou incompatível, calcula na hora com base na regra técnica padrão do gesso
-  const totalExtracted = Object.values(totals).reduce((a, b) => a + b, 0);
-  if (totalExtracted === 0 && Array.isArray(roomsData)) {
-    for (const r of roomsData) {
-      const area = (Number(r.lengthMeters) || 0) * (Number(r.widthMeters) || 0);
-      const perimeter = 2 * ((Number(r.lengthMeters) || 0) + (Number(r.widthMeters) || 0));
-
-      const services = Array.isArray(r.services) ? r.services : [];
-      for (const s of services) {
-        if (s.type === 'FORRO_PLAQUINHA_60X60' || !s.type) {
-          // Rendimento técnico: 2.78 placas/m² + 5% quebra = ~2.92 un/m²; Gesso pó chumbamento: ~2.5 kg/m²
-          totals.placaGesso60x60 += Math.ceil(area * 2.92);
-          totals.gessoPoKg += Number((area * 2.5).toFixed(1));
-          totals.arameGalvanizadoKg += Number((area * 0.08).toFixed(2));
-          totals.sisalKg += Number((area * 0.05).toFixed(2));
-        } else if (s.type === 'REVESTIMENTO_GESSO_LISO') {
-          // Rendimento: ~5 kg de pó por m²
-          totals.gessoPoKg += Number((area * 5.0).toFixed(1));
-        } else if (s.type.includes('MOLDURA') || s.type.includes('SANCA') || s.type.includes('CORTINEIRO')) {
-          const linearM = Number(s.customLinearMeters) || perimeter;
-          totals.gessoColaKg += Number((linearM * 0.25).toFixed(1));
-          totals.gessoPoKg += Number((linearM * 1.5).toFixed(1));
-        }
-      }
-    }
-  }
-
-  return totals;
-}
-
 export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
   if (!(await getAdminSession())) return unauthorized();
 
   try {
-    const quote = (await prisma.quote.findUnique({ where: { id } })) as any;
+    const quote = await prisma.quote.findUnique({ where: { id } });
     if (!quote) return { success: false, error: 'Orçamento não encontrado.' };
 
     const shouldDeduct =
@@ -141,30 +75,27 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
     const shouldRefund =
       (status === 'CANCELADO' || status === 'PENDENTE') && quote.stockDeducted;
 
-    // Obtém materiais de forma garantida (lendo snapshot ou calculando na hora)
-    const materials = calculateMaterialsFromRoomsOrSnapshot(quote.roomsData, quote.materialsSnapshot);
-
-    console.log('[DEBUG ESTOQUE] Materiais calculados para movimentação:', materials);
-
     await prisma.$transaction(async (tx) => {
-      // 1. Aplica a baixa no estoque
+      // 1. Aplica a baixa no estoque com as mesmas quantidades do orçamento e grava o que saiu
       if (shouldDeduct) {
-        for (const [itemKey, qty] of Object.entries(materials)) {
+        const movement = getQuoteStockQuantities(quote.roomsData, quote.materialsSnapshot);
+        for (const [itemKey, qty] of Object.entries(movement)) {
           if (qty > 0) {
             await tx.stockBalance.update({
               where: { itemKey },
-              data: { currentQuantity: { decrement: Number(qty.toFixed(2)) } },
+              data: { currentQuantity: { decrement: qty } },
             });
           }
         }
         await tx.quote.update({
           where: { id },
-          data: { status, stockDeducted: true },
+          data: { status, stockDeducted: true, stockMovement: movement },
         });
       }
-      // 2. Estorna materiais se a obra for cancelada ou voltar a ser pendente
+      // 2. Estorna exatamente o que saiu; baixas antigas (sem stockMovement) usam a fórmula da época
       else if (shouldRefund) {
-        for (const [itemKey, qty] of Object.entries(materials)) {
+        const movement = (quote.stockMovement as StockQuantities | null) ?? legacyStockQuantities(quote.roomsData);
+        for (const [itemKey, qty] of Object.entries(movement)) {
           if (qty > 0) {
             await tx.stockBalance.update({
               where: { itemKey },
@@ -174,7 +105,7 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
         }
         await tx.quote.update({
           where: { id },
-          data: { status, stockDeducted: false },
+          data: { status, stockDeducted: false, stockMovement: Prisma.DbNull },
         });
       }
       // 3. Apenas troca de status sem alterar estoque (ex: de APROVADO para EM_EXECUCAO)

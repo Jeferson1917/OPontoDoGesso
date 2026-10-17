@@ -1,4 +1,5 @@
 // src/app/data/calculatorTypes.ts
+import type { StockItemKey } from './stockTypes';
 
 export type TraditionalPlasterService =
   | 'FORRO_PLAQUINHA_60X60'     // Forro tradicional suspenso
@@ -29,6 +30,8 @@ export interface MaterialRequirement {
   quantity: number;
   unitCost: number;
   totalCost: number;
+  stockItemKey?: StockItemKey; // Item do estoque consumido (ausente se não sai do pátio, ex: moldura fabricada)
+  stockQuantity?: number;      // Quantidade na unidade do estoque (kg ou unidades)
 }
 
 export interface RoomCalculationResult {
