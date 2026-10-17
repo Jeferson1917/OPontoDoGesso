@@ -74,11 +74,13 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
     const quote = await prisma.quote.findUnique({ where: { id } });
     if (!quote) return { success: false, error: 'Orçamento não encontrado.' };
 
-    const shouldDeduct =
-      (status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'CONCLUIDO') &&
-      !quote.stockDeducted;
+    const isApprovedStatus = status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'CONCLUIDO';
+    const shouldDeduct = isApprovedStatus && !quote.stockDeducted;
     const shouldRefund =
       (status === 'CANCELADO' || status === 'PENDENTE') && quote.stockDeducted;
+
+    // Data de aprovação: preservada entre APROVADO/EM_EXECUCAO/CONCLUIDO, limpa se voltar a pendente ou cancelar
+    const approvedAt = isApprovedStatus ? (quote.approvedAt ?? new Date()) : null;
 
     await prisma.$transaction(async (tx) => {
       // 1. Aplica a baixa no estoque com as mesmas quantidades do orçamento e grava o que saiu
@@ -110,7 +112,7 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
         // Só marca como baixado se ainda não estava — evita baixa dupla em cliques simultâneos
         const { count } = await tx.quote.updateMany({
           where: { id, stockDeducted: false },
-          data: { status, stockDeducted: true, stockMovement: movement },
+          data: { status, approvedAt, stockDeducted: true, stockMovement: movement },
         });
         if (count === 0) throw new QuoteStockError('Este orçamento já teve o estoque baixado. Atualize a página.');
       }
@@ -128,7 +130,7 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
         // Só estorna se ainda estava baixado — evita devolução dupla em cliques simultâneos
         const { count } = await tx.quote.updateMany({
           where: { id, stockDeducted: true },
-          data: { status, stockDeducted: false, stockMovement: Prisma.DbNull },
+          data: { status, approvedAt, stockDeducted: false, stockMovement: Prisma.DbNull },
         });
         if (count === 0) throw new QuoteStockError('Este orçamento já teve o estoque devolvido. Atualize a página.');
       }
@@ -136,7 +138,7 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
       else {
         await tx.quote.update({
           where: { id },
-          data: { status },
+          data: { status, approvedAt },
         });
       }
     }, { maxWait: 10_000, timeout: 20_000 }); // Neon tem latência alta; o padrão de 5s é curto
