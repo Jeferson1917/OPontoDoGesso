@@ -8,6 +8,7 @@ import {
   registerCounterSaleAction 
 } from '../../actions/stockActions';
 import { splitTruckCosts } from '../../utils/truckCost';
+import type { StockItemKey } from '../../data/stockTypes';
 import { toast } from 'sonner';
 import { 
   Truck, 
@@ -39,7 +40,7 @@ export default function AdminStockPage() {
   });
 
   const [saleForm, setSaleForm] = useState({
-    itemKey: 'gessoPoKg',
+    itemKey: 'gessoPoKg' as StockItemKey,
     quantity: 20,
     unitPrice: 1.10,
     customerName: '',
@@ -449,7 +450,7 @@ export default function AdminStockPage() {
                     id="sale-item"
                     value={saleForm.itemKey} 
                     onChange={(e) => {
-                      const id = e.target.value;
+                      const id = e.target.value as StockItemKey;
                       const item = balances.find((b) => b.itemKey === id);
                       setSaleForm({
                         ...saleForm,

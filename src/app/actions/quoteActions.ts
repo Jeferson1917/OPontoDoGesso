@@ -6,34 +6,30 @@ import { revalidatePath } from 'next/cache';
 import { Prisma, QuoteStatus } from '@prisma/client';
 import { getQuoteStockQuantities, legacyStockQuantities, type StockQuantities } from '../utils/stockConsumption';
 import { getAdminSession, unauthorized } from '../../lib/auth';
+import { z } from 'zod';
+import { createQuoteSchema, idSchema, parseInput, quoteStatusSchema } from '../data/schemas';
 
-export interface CreateQuoteInput {
-  clientName: string;
-  clientPhone?: string;
-  totalAreaM2: number;
-  suggestedFinalPrice: number;
-  finalAgreedPrice: number;
-  discountApplied: number;
-  roomsData: any;
-  materialsSnapshot: any;
-  notes?: string;
-}
+export type CreateQuoteInput = z.input<typeof createQuoteSchema>;
 
-export async function saveQuoteAction(data: CreateQuoteInput) {
+export async function saveQuoteAction(input: CreateQuoteInput) {
   if (!(await getAdminSession())) return unauthorized();
+
+  const parsed = parseInput(createQuoteSchema, input);
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  const data = parsed.data;
 
   try {
     const newQuote = await prisma.quote.create({
       data: {
         clientName: data.clientName,
-        clientPhone: data.clientPhone || null,
+        clientPhone: data.clientPhone ?? null,
         totalAreaM2: data.totalAreaM2,
         suggestedFinalPrice: data.suggestedFinalPrice,
         finalAgreedPrice: data.finalAgreedPrice,
         discountApplied: data.discountApplied,
         roomsData: data.roomsData,
         materialsSnapshot: data.materialsSnapshot,
-        notes: data.notes || null,
+        notes: data.notes ?? null,
         status: 'PENDENTE',
         stockDeducted: false,
       },
@@ -69,6 +65,10 @@ const formatQty = (value: number) => Number(value.toFixed(2)).toLocaleString('pt
 
 export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
   if (!(await getAdminSession())) return unauthorized();
+
+  const parsedId = parseInput(idSchema, id);
+  const parsedStatus = parseInput(quoteStatusSchema, status);
+  if (!parsedId.ok || !parsedStatus.ok) return { success: false, error: 'Orçamento ou status inválido.' };
 
   try {
     const quote = await prisma.quote.findUnique({ where: { id } });
