@@ -8,10 +8,12 @@ import { About } from './components/About';
 import { Contact } from './components/Contact';
 import { Footer } from './components/Footer';
 import { FloatingWhatsApp } from './components/FloatingWhatsApp';
+import { LocalBusinessJsonLd } from './components/LocalBusinessJsonLd';
 
 export default function Home() {
   return (
     <div className="min-h-screen flex flex-col bg-white text-neutral-900 pt-20">
+      <LocalBusinessJsonLd />
       <Header />
 
       <main className="flex-1 flex flex-col">

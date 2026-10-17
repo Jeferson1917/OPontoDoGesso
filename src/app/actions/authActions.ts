@@ -5,6 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, createSessionToken } from '../../lib/session';
 import { clearLoginFailures, getLoginBlockMinutes, registerLoginFailure } from '../../lib/loginRateLimit';
+import { getAdminSession, revokeSession } from '../../lib/auth';
 
 // Compara via hash para ter tamanho fixo e tempo constante
 function safeEqual(a: string, b: string): boolean {
@@ -65,6 +66,9 @@ export async function loginAdmin(formData: FormData) {
 }
 
 export async function logoutAdmin() {
+  const session = await getAdminSession();
+  if (session) await revokeSession(session);
+
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
   redirect('/admin/login');

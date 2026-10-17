@@ -4,6 +4,8 @@ import { prisma } from '../../../lib/prisma';
 import { requireAdminPage } from '../../../lib/auth';
 import { stockItemLabel } from '../../data/stockTypes';
 import { ArrowLeft, ShoppingBag, Package } from 'lucide-react';
+import { formatBusinessDate } from '../../utils/dates';
+import { DeleteSaleButton } from './DeleteSaleButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,13 +105,14 @@ export default async function AdminCounterSalesHistoryPage() {
                   <th className="py-3 px-2">Preço Unitário</th>
                   <th className="py-3 px-2">Valor Total</th>
                   <th className="py-3 px-2 text-right">Lucro Estimado</th>
+                  <th className="py-3 px-2 w-10"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {sales.map((sale) => (
                   <tr key={sale.id} className="hover:bg-neutral-50/70 transition-colors">
                     <td className="py-3.5 px-2 text-neutral-500 font-medium whitespace-nowrap">
-                      {new Date(sale.createdAt).toLocaleDateString('pt-BR', {
+                      {formatBusinessDate(sale.createdAt, {
                         day: '2-digit',
                         month: '2-digit',
                         year: 'numeric',
@@ -134,6 +137,12 @@ export default async function AdminCounterSalesHistoryPage() {
                     </td>
                     <td className="py-3.5 px-2 text-right font-black text-emerald-600">
                       +{sale.estimatedProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td className="py-3.5 px-2 text-right">
+                      <DeleteSaleButton
+                        saleId={sale.id}
+                        description={`${sale.quantity} × ${stockItemLabel(sale.itemKey)} — ${sale.customerName || 'Cliente Balcão'}`}
+                      />
                     </td>
                   </tr>
                 ))}

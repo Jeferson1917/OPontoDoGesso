@@ -5,6 +5,7 @@ export type StockDataResult = Awaited<ReturnType<typeof getStockDataAction>>;
 export type StockData = Extract<StockDataResult, { success: true }>;
 export type StockBalanceRow = StockData['balances'][number];
 export type TruckDeliveryRow = StockData['deliveries'][number];
+export type StockAdjustmentRow = StockData['adjustments'][number];
 
 export const initialTruckForm = {
   supplier: 'Polo do Araripe / Gipsita',

@@ -8,6 +8,7 @@ import { getQuoteStockQuantities, legacyStockQuantities, type StockQuantities } 
 import { getAdminSession, unauthorized } from '../../lib/auth';
 import { z } from 'zod';
 import { createQuoteSchema, idSchema, parseInput, quoteStatusSchema } from '../data/schemas';
+import { canChangeStatus, QUOTE_STATUS_LABELS } from '../data/quoteStatus';
 
 export type CreateQuoteInput = z.input<typeof createQuoteSchema>;
 
@@ -50,8 +51,9 @@ export async function getQuotesAction() {
   try {
     const quotes = await prisma.quote.findMany({
       orderBy: { createdAt: 'desc' },
+      include: { payments: { orderBy: { paidAt: 'asc' } } },
     });
-    return { success: true as const, quotes: quotes.map(toPlain) };
+    return { success: true as const, quotes: quotes.map((q) => ({ ...toPlain(q), payments: q.payments.map(toPlain) })) };
   } catch (error) {
     console.error('Erro ao buscar orçamentos:', error);
     return { success: false as const, error: 'Falha ao carregar lista de orçamentos.' };
@@ -73,6 +75,9 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
   try {
     const quote = await prisma.quote.findUnique({ where: { id } });
     if (!quote) return { success: false as const, error: 'Orçamento não encontrado.' };
+    if (quote.status !== status && !canChangeStatus(quote.status, status)) {
+      return { success: false as const, error: `Não é possível mudar de ${QUOTE_STATUS_LABELS[quote.status]} para ${QUOTE_STATUS_LABELS[status]}.` };
+    }
 
     const isApprovedStatus = status === 'APROVADO' || status === 'EM_EXECUCAO' || status === 'CONCLUIDO';
     const shouldDeduct = isApprovedStatus && !quote.stockDeducted;
@@ -159,5 +164,28 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
     }
     console.error('Erro ao atualizar status e estoque:', error);
     return { success: false as const, error: 'Falha ao atualizar status e movimentar estoque.' };
+  }
+}
+
+// Só orçamentos que não movimentaram estoque: pendentes ou cancelados (já devolvidos)
+export async function deleteQuoteAction(id: string) {
+  if (!(await getAdminSession())) return unauthorized();
+  const parsedId = parseInput(idSchema, id);
+  if (!parsedId.ok) return { success: false as const, error: 'Orçamento inválido.' };
+
+  try {
+    const { count } = await prisma.quote.deleteMany({
+      where: { id: parsedId.data, stockDeducted: false, status: { in: ['PENDENTE', 'CANCELADO'] }, payments: { none: {} } },
+    });
+    if (count === 0) {
+      return { success: false as const, error: 'Só é possível excluir orçamentos pendentes ou cancelados, sem material baixado do estoque e sem pagamentos lançados.' };
+    }
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/historico');
+    return { success: true as const };
+  } catch (error) {
+    console.error('Erro ao excluir orçamento:', error);
+    return { success: false as const, error: 'Falha ao excluir o orçamento.' };
   }
 }

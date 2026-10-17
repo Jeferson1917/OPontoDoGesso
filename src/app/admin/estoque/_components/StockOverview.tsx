@@ -1,14 +1,16 @@
-import { AlertTriangle, History, RefreshCw } from 'lucide-react';
+import { AlertTriangle, History, RefreshCw, Trash2 } from 'lucide-react';
 import type { StockBalanceRow, TruckDeliveryRow } from './types';
+import { formatBusinessDate } from '../../../utils/dates';
 
 interface StockOverviewProps {
   balances: StockBalanceRow[];
   deliveries: TruckDeliveryRow[];
   loading: boolean;
   onRefresh: () => void;
+  onDeleteDelivery: (delivery: TruckDeliveryRow) => void;
 }
 
-export function StockOverview({ balances, deliveries, loading, onRefresh }: StockOverviewProps) {
+export function StockOverview({ balances, deliveries, loading, onRefresh, onDeleteDelivery }: StockOverviewProps) {
   return (
     <div className="space-y-6">
       {loading && balances.length === 0 ? (
@@ -106,23 +108,36 @@ export function StockOverview({ balances, deliveries, loading, onRefresh }: Stoc
                   <th className="py-2.5 text-right">Volume</th>
                   <th className="py-2.5 text-right">Custo Rateado / Saco</th>
                   <th className="py-2.5 text-right">Valor Total Carga</th>
+                  <th className="py-2.5 w-10"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {deliveries.map((del) => (
                   <tr key={del.id} className="hover:bg-neutral-50/50">
                     <td className="py-3 font-semibold text-neutral-600">
-                      {new Date(del.createdAt).toLocaleDateString('pt-BR')}
+                      {formatBusinessDate(del.createdAt)}
                     </td>
                     <td className="py-3 text-neutral-700 font-bold">{del.supplier}</td>
                     <td className="py-3 text-right font-bold text-brand-charcoal-dark">
                       {del.tonsGessoPo} Toneladas
+                      {del.platesQuantity > 0 && <span className="block text-[10px] text-neutral-500">+ {del.platesQuantity.toLocaleString('pt-BR')} placas</span>}
                     </td>
                     <td className="py-3 text-right text-emerald-700 font-bold">
                       R$ {(del.realCostPerKg * 20).toFixed(2)}
                     </td>
                     <td className="py-3 text-right font-black text-brand-red">
                       {(del.gessoCostTotal + (del.platesCostTotal ?? 0) + del.freightCost + del.unloadingLaborCost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td className="py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => onDeleteDelivery(del)}
+                        className="p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        aria-label={`Excluir carga de ${del.supplier}`}
+                        title="Excluir carga (lançada errada)"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}

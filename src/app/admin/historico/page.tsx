@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import Link from "next/link";
 import {
   getQuotesAction,
   updateQuoteStatusAction,
+  deleteQuoteAction,
 } from "../../actions/quoteActions";
 import { generateQuotePDF } from "../../utils/pdfGenerator";
 import type { RoomInput } from "../../data/calculatorTypes";
@@ -17,8 +18,14 @@ import {
   Clock,
   PlayCircle,
   XCircle,
+  Trash2,
 } from "lucide-react";
 import { QuoteStatus } from "@prisma/client";
+import { formatBusinessDate } from "../../utils/dates";
+import { summarizePayments } from "../../utils/payments";
+import { PaymentsPanel } from "./PaymentsPanel";
+import { matchesQuoteFilter, type PaymentFilter, type QuoteFilter } from "../../utils/quoteFilters";
+import { ALLOWED_STATUS_TRANSITIONS, QUOTE_STATUS_LABELS } from "../../data/quoteStatus";
 
 type QuotesResult = Awaited<ReturnType<typeof getQuotesAction>>;
 type QuoteRow = Extract<QuotesResult, { success: true }>["quotes"][number];
@@ -26,6 +33,15 @@ type QuoteRow = Extract<QuotesResult, { success: true }>["quotes"][number];
 export default function AdminQuotesHistoryPage() {
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<QuoteFilter>({ text: '', status: 'TODOS', payment: 'TODOS' });
+
+  const visibleQuotes = quotes.filter((q) =>
+    matchesQuoteFilter(
+      { ...q, price: q.finalAgreedPrice > 0 ? q.finalAgreedPrice : q.suggestedFinalPrice },
+      filter
+    )
+  );
 
   const applyQuotes = (res: QuotesResult) => {
     if (res.success) {
@@ -50,19 +66,31 @@ export default function AdminQuotesHistoryPage() {
     const res = await updateQuoteStatusAction(id, newStatus);
 
     if (res.success) {
+      const label = QUOTE_STATUS_LABELS[newStatus];
       if (res.deducted) {
-        toast.success(`Status alterado para ${newStatus} e materiais baixados do estoque!`, { id: toastId });
+        toast.success(`Status alterado para ${label} e materiais baixados do estoque!`, { id: toastId });
       } else if (res.refunded) {
-        toast.success(`Obra cancelada. Materiais devolvidos ao estoque com sucesso!`, { id: toastId });
+        toast.success(`Status alterado para ${label}. Materiais devolvidos ao estoque.`, { id: toastId });
       } else {
-        toast.success(`Status atualizado para ${newStatus}!`, { id: toastId });
+        toast.success(`Status atualizado para ${label}!`, { id: toastId });
       }
 
-      setQuotes((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, status: newStatus } : q))
-      );
+      // Recarrega para refletir também a baixa/devolução de estoque
+      fetchQuotes();
     } else {
       toast.error(res.error || 'Falha ao atualizar status.', { id: toastId });
+    }
+  };
+
+  const handleDeleteQuote = async (id: string, clientName: string) => {
+    if (!confirm(`Excluir o orçamento de ${clientName}? Essa ação não pode ser desfeita.`)) return;
+    const toastId = toast.loading('Excluindo orçamento...');
+    const res = await deleteQuoteAction(id);
+    if (res.success) {
+      toast.success('Orçamento excluído.', { id: toastId });
+      setQuotes((prev) => prev.filter((q) => q.id !== id));
+    } else {
+      toast.error(res.error, { id: toastId });
     }
   };
 
@@ -131,11 +159,51 @@ export default function AdminQuotesHistoryPage() {
           </button>
         </div>
 
+        {/* Busca e filtros */}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <input
+            type="search"
+            aria-label="Buscar por cliente ou telefone"
+            placeholder="Buscar por cliente ou telefone..."
+            value={filter.text}
+            onChange={(e) => setFilter({ ...filter, text: e.target.value })}
+            className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-300 text-sm bg-white focus:outline-none focus:border-brand-red"
+          />
+          <select
+            aria-label="Filtrar por status"
+            value={filter.status}
+            onChange={(e) => setFilter({ ...filter, status: e.target.value })}
+            className="px-3 py-2.5 rounded-xl border border-neutral-300 text-sm bg-white"
+          >
+            <option value="TODOS">Todos os status</option>
+            {(Object.keys(QUOTE_STATUS_LABELS) as QuoteStatus[]).map((s) => (
+              <option key={s} value={s}>{QUOTE_STATUS_LABELS[s]}</option>
+            ))}
+          </select>
+          <select
+            aria-label="Filtrar por pagamento"
+            value={filter.payment}
+            onChange={(e) => setFilter({ ...filter, payment: e.target.value as PaymentFilter })}
+            className="px-3 py-2.5 rounded-xl border border-neutral-300 text-sm bg-white"
+          >
+            <option value="TODOS">Todos os pagamentos</option>
+            <option value="A_RECEBER">A receber</option>
+            <option value="QUITADO">Quitados</option>
+          </select>
+        </div>
+        {quotes.length > 0 && (
+          <p className="text-xs text-neutral-500 -mt-3">
+            {visibleQuotes.length === quotes.length
+              ? `${quotes.length} orçamento${quotes.length > 1 ? 's' : ''}`
+              : `${visibleQuotes.length} de ${quotes.length} orçamentos`}
+          </p>
+        )}
+
         {/* Tabela de Orçamentos */}
         <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
-          {quotes.length === 0 && !loading ? (
+          {visibleQuotes.length === 0 && !loading ? (
             <div className="p-12 text-center text-neutral-400 text-sm">
-              Nenhum orçamento salvo no banco de dados ainda.
+              {quotes.length === 0 ? 'Nenhum orçamento salvo no banco de dados ainda.' : 'Nenhum orçamento encontrado com esses filtros.'}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -151,18 +219,19 @@ export default function AdminQuotesHistoryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
-                  {quotes.map((quote) => {
+                  {visibleQuotes.map((quote) => {
                     const effectivePrice = (quote.finalAgreedPrice && quote.finalAgreedPrice > 0)
                       ? quote.finalAgreedPrice
                       : quote.suggestedFinalPrice;
 
+                    const payment = summarizePayments(effectivePrice, quote.payments);
+                    const expanded = expandedId === quote.id;
+
                     return (
-                      <tr
-                        key={quote.id}
-                        className="hover:bg-neutral-50/60 transition-colors"
-                      >
+                      <Fragment key={quote.id}>
+                      <tr className="hover:bg-neutral-50/60 transition-colors">
                         <td className="p-4 font-medium text-neutral-500">
-                          {new Date(quote.createdAt).toLocaleDateString("pt-BR")}
+                          {formatBusinessDate(quote.createdAt)}
                         </td>
                         <td className="p-4">
                           <span className="font-bold text-brand-charcoal-dark block">
@@ -190,6 +259,21 @@ export default function AdminQuotesHistoryPage() {
                               })}
                             </span>
                           )}
+                          <button
+                            type="button"
+                            onClick={() => setExpandedId(expanded ? null : quote.id)}
+                            className={`mt-1 block text-[10px] font-bold hover:underline ${
+                              payment.status === 'QUITADO' ? 'text-emerald-700' : payment.status === 'PARCIAL' ? 'text-amber-700' : 'text-neutral-500'
+                            }`}
+                            aria-expanded={expanded}
+                          >
+                            {payment.status === 'QUITADO'
+                              ? 'Quitado'
+                              : payment.status === 'PARCIAL'
+                                ? `Pago ${payment.paid.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} · falta ${payment.remaining.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                                : 'Nada recebido'}{' '}
+                            {expanded ? '▲' : '▼'}
+                          </button>
                         </td>
                         <td className="p-4">
                           <div className="flex items-center gap-2">
@@ -204,11 +288,12 @@ export default function AdminQuotesHistoryPage() {
                               }
                               className="text-[11px] bg-neutral-100 border border-neutral-200 rounded-lg px-2 py-1 focus:outline-none focus:border-brand-red font-semibold text-neutral-700"
                             >
-                              <option value="PENDENTE">Pendente</option>
-                              <option value="APROVADO">Aprovado</option>
-                              <option value="EM_EXECUCAO">Em Obra</option>
-                              <option value="CONCLUIDO">Concluído</option>
-                              <option value="CANCELADO">Cancelado</option>
+                              {/* Só o status atual e as transições permitidas */}
+                              {[quote.status, ...ALLOWED_STATUS_TRANSITIONS[quote.status]].map((status) => (
+                                <option key={status} value={status}>
+                                  {QUOTE_STATUS_LABELS[status]}
+                                </option>
+                              ))}
                             </select>
                           </div>
                         </td>
@@ -220,6 +305,7 @@ export default function AdminQuotesHistoryPage() {
                                 clientName: quote.clientName,
                                 clientPhone: quote.clientPhone || "",
                                 rooms: quote.roomsData as unknown as RoomInput[], // validado pelo zod ao salvar
+                                issuedAt: quote.createdAt,
                                 quote: {
                                   totalAreaM2: quote.totalAreaM2,
                                   suggestedFinalPrice: quote.suggestedFinalPrice,
@@ -231,8 +317,34 @@ export default function AdminQuotesHistoryPage() {
                           >
                             <FileText className="w-3.5 h-3.5" /> PDF
                           </button>
+                          {!quote.stockDeducted && (quote.status === "PENDENTE" || quote.status === "CANCELADO") && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteQuote(quote.id, quote.clientName)}
+                              className="ml-1 p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors align-middle"
+                              aria-label={`Excluir orçamento de ${quote.clientName}`}
+                              title="Excluir orçamento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
+                      {expanded && (
+                        <tr>
+                          <td colSpan={6} className="bg-neutral-50 px-4 py-4 border-t border-neutral-200">
+                            <PaymentsPanel
+                              key={`${quote.id}-${payment.paid}`} // recomeça o formulário com o novo "falta"
+                              quoteId={quote.id}
+                              total={effectivePrice}
+                              cancelled={quote.status === 'CANCELADO'}
+                              payments={quote.payments}
+                              onChanged={fetchQuotes}
+                            />
+                          </td>
+                        </tr>
+                      )}
+                      </Fragment>
                     );
                   })}
                 </tbody>

@@ -30,7 +30,7 @@ export const galleryItems: GalleryItem[] = [
 ];
 
 export const historyData = {
-  foundedYear: '2015', // Ajuste para o ano real de início
+  foundedYear: '2015',
   title: 'Compromisso com a Qualidade em Cada Detalhe',
   story: [
     'Fundada com o propósito de oferecer serviços de excelência e suprir a demanda por materiais confiáveis, O Ponto do Gesso consolidou-se como referência no mercado de acabamentos e gesso.',

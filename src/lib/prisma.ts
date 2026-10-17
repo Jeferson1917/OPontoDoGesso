@@ -39,6 +39,7 @@ function createPrismaClient() {
       counterSale: decimalFields('unitPrice', 'totalValue', 'estimatedProfit'),
       pricingConfig: decimalFields('minimumProjectPrice'),
       stockBalance: decimalFields('averageUnitCost', 'counterSalePrice'),
+      payment: decimalFields('amount'),
     },
   });
 }

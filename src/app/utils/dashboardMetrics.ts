@@ -1,6 +1,7 @@
 // src/app/utils/dashboardMetrics.ts
 import type { MonthlyData } from '../admin/DashboardCharts';
 import { getQuoteStockQuantities, type StockQuantities } from './stockConsumption';
+import { businessDateParts, businessMonthStart } from './dates';
 
 export const APPROVED_STATUSES = ['APROVADO', 'EM_EXECUCAO', 'CONCLUIDO'] as const;
 export const DASHBOARD_MONTHS = 6;
@@ -31,7 +32,11 @@ export interface TruckMetricsRow {
 }
 
 const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const monthKey = (d: Date) => `${MONTH_NAMES[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`;
+// Mês no fuso do negócio (o servidor de produção roda em UTC)
+const monthKey = (d: Date) => {
+  const { year, month } = businessDateParts(d);
+  return `${MONTH_NAMES[month]}/${year.toString().slice(2)}`;
+};
 
 export const getEffectivePrice = (q: Pick<QuoteMetricsRow, 'finalAgreedPrice' | 'suggestedFinalPrice'>) =>
   q.finalAgreedPrice && q.finalAgreedPrice > 0 ? q.finalAgreedPrice : q.suggestedFinalPrice;
@@ -40,7 +45,8 @@ export const isApproved = (status: string) => (APPROVED_STATUSES as readonly str
 
 // Primeiro dia do mês mais antigo exibido nos gráficos
 export function dashboardStartDate(now = new Date()): Date {
-  return new Date(now.getFullYear(), now.getMonth() - (DASHBOARD_MONTHS - 1), 1);
+  const { year, month } = businessDateParts(now);
+  return businessMonthStart(year, month - (DASHBOARD_MONTHS - 1));
 }
 
 // Custo direto da obra (mão de obra + materiais) gravado no orçamento
@@ -66,8 +72,9 @@ export function buildMonthlyFinancials(
   now = new Date()
 ): MonthlyData[] {
   const months = new Map<string, MonthlyData>();
+  const today = businessDateParts(now);
   for (let i = DASHBOARD_MONTHS - 1; i >= 0; i--) {
-    const key = monthKey(new Date(now.getFullYear(), now.getMonth() - i, 1));
+    const key = monthKey(businessMonthStart(today.year, today.month - i));
     months.set(key, {
       month: key,
       faturamento: 0, lucro: 0, custo: 0,
