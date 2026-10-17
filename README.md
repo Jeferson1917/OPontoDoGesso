@@ -139,6 +139,7 @@ prisma/schema.prisma
 
 ## Problemas comuns
 
-- **`Can't reach database server` ou `Timed out fetching a new connection` em desenvolvimento**: em algumas redes o IPv6 não alcança o Neon e as conexões falham de forma intermitente. Teste com `Test-NetConnection <host-do-neon> -Port 5432` (PowerShell). Se for isso, desative o IPv6 no adaptador de rede ou use outra rede; aumentar a tolerância também ajuda: acrescente `&connect_timeout=15&pool_timeout=30` à `DATABASE_URL`.
+- **`Can't reach database server` no app**: resolvido desde a #44. O app conecta pelo driver `pg` (`@prisma/adapter-pg`), que usa a rede do Node e cai para o IPv4 sozinho quando a rede não alcança o Neon por IPv6. Se o erro voltar, confira a `DATABASE_URL`.
+- **O mesmo erro no Prisma CLI** (`prisma db push`, `migrate diff`): o CLI ainda usa o motor próprio do Prisma, sem essa troca automática para IPv4. Rode o comando de novo ou use uma rede com IPv6 funcionando.
 - **`AUTH_SECRET ausente ou com menos de 32 caracteres`**: defina a variável (veja acima).
 - **`EPERM` ao rodar `prisma db push` ou `prisma generate` no Windows**: pare o `npm run dev` antes (ele trava o arquivo do Prisma Client).
