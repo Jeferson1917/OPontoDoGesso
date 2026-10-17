@@ -18,6 +18,7 @@ model Quote {
   discountApplied     Float        @default(0.0)
   stockDeducted       Boolean      @default(false)
   stockMovement       Json?        // Quantidades baixadas do estoque por itemKey (usado no estorno)
+  approvedAt          DateTime?    // Quando a obra foi aprovada (receita entra neste mês no dashboard)
   status              QuoteStatus  @default(PENDENTE)
   roomsData           Json         
   materialsSnapshot   Json         

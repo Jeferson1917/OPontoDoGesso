@@ -5,7 +5,7 @@ import { prisma } from '../../lib/prisma';
 import { requireAdminPage } from '../../lib/auth';
 import { logoutAdmin } from '../actions/authActions';
 import ChartsWrapper from './ChartsWrapper';
-import { MonthlyData } from './DashboardCharts';
+import { APPROVED_STATUSES, buildMonthlyFinancials, dashboardStartDate, getEffectivePrice, isApproved } from '../utils/dashboardMetrics';
 import { 
   Calculator, 
   Package, 
@@ -28,22 +28,36 @@ export const dynamic = 'force-dynamic';
 export default async function AdminDashboardPage() {
   await requireAdminPage();
 
-  const [quotes, stockBalances, recentSales, truckDeliveries] = await Promise.all([
-    prisma.quote.findMany({ orderBy: { createdAt: 'desc' } }),
+  const since = dashboardStartDate();
+
+  // Totais dos cards usam o histórico todo, mas só com os campos necessários;
+  // linhas completas (snapshot, vendas, cargas) só da janela dos gráficos
+  const [quotes, chartQuotes, stockBalances, salesTotals, chartSales, truckDeliveries] = await Promise.all([
+    prisma.quote.findMany({
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, clientName: true, clientPhone: true, totalAreaM2: true, status: true, suggestedFinalPrice: true, finalAgreedPrice: true },
+    }),
+    prisma.quote.findMany({
+      where: {
+        status: { in: [...APPROVED_STATUSES] },
+        OR: [{ approvedAt: { gte: since } }, { approvedAt: null, createdAt: { gte: since } }],
+      },
+      select: { status: true, createdAt: true, approvedAt: true, totalAreaM2: true, suggestedFinalPrice: true, finalAgreedPrice: true, roomsData: true, materialsSnapshot: true, stockMovement: true },
+    }),
     prisma.stockBalance.findMany(),
-    prisma.counterSale.findMany({ orderBy: { createdAt: 'desc' } }),
-    prisma.truckDelivery.findMany({ orderBy: { createdAt: 'desc' } }),
+    prisma.counterSale.aggregate({ _sum: { totalValue: true }, _count: true }),
+    prisma.counterSale.findMany({
+      where: { createdAt: { gte: since } },
+      select: { createdAt: true, itemKey: true, quantity: true, totalValue: true, estimatedProfit: true },
+    }),
+    prisma.truckDelivery.findMany({ where: { date: { gte: since } }, select: { date: true, tonsGessoPo: true } }),
   ]);
 
-  const getEffectivePrice = (q: any) =>
-    q.finalAgreedPrice && q.finalAgreedPrice > 0 ? q.finalAgreedPrice : q.suggestedFinalPrice;
-
   const totalQuotesValue = quotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
-  const approvedQuotes = quotes.filter(
-    (q) => q.status === 'APROVADO' || q.status === 'EM_EXECUCAO' || q.status === 'CONCLUIDO'
-  );
+  const approvedQuotes = quotes.filter((q) => isApproved(q.status));
   const approvedRevenue = approvedQuotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
-  const counterSalesRevenue = recentSales.reduce((acc, s) => acc + s.totalValue, 0);
+  const counterSalesRevenue = salesTotals._sum.totalValue ?? 0;
+  const counterSalesCount = salesTotals._count;
 
   const gessoItem = stockBalances.find((s) => s.itemKey === 'gessoPoKg');
   const placaItem = stockBalances.find((s) => s.itemKey === 'placaGesso60x60');
@@ -52,77 +66,7 @@ export default async function AdminDashboardPage() {
   const totalPlacas = placaItem ? placaItem.currentQuantity : 0;
   const isGessoLow = gessoItem ? gessoItem.currentQuantity <= gessoItem.minThreshold : false;
 
-  const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  const now = new Date();
-  const monthlyMap = new Map<string, MonthlyData>();
-
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${monthNames[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`;
-    monthlyMap.set(key, {
-      month: key,
-      faturamento: 0,
-      lucro: 0,
-      custo: 0,
-      gessoEntradaTon: 0,
-      gessoSaidaTon: 0,
-      faturamentoBalcao: 0,
-      lucroBalcao: 0,
-      faturamentoObras: 0,
-      lucroObras: 0,
-      gessoObrasTon: 0,
-      gessoBalcaoTon: 0,
-    });
-  }
-
-  for (const q of approvedQuotes) {
-    const d = new Date(q.createdAt);
-    const key = `${monthNames[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`;
-    if (monthlyMap.has(key)) {
-      const current = monthlyMap.get(key)!;
-      const price = getEffectivePrice(q);
-      const estimatedCost = price * 0.62;
-      const estimatedProfit = price - estimatedCost;
-      const tons = (q.totalAreaM2 * 2.5) / 1000;
-
-      current.faturamento += price;
-      current.lucro += estimatedProfit;
-      current.custo += estimatedCost;
-      current.faturamentoObras += price;
-      current.lucroObras += estimatedProfit;
-      current.gessoObrasTon += tons;
-      current.gessoSaidaTon += tons;
-    }
-  }
-
-  for (const s of recentSales) {
-    const d = new Date(s.createdAt);
-    const key = `${monthNames[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`;
-    if (monthlyMap.has(key)) {
-      const current = monthlyMap.get(key)!;
-      const cost = s.totalValue - s.estimatedProfit;
-      const tons = s.itemKey === 'gessoPoKg' ? s.quantity / 1000 : 0;
-
-      current.faturamento += s.totalValue;
-      current.lucro += s.estimatedProfit;
-      current.custo += cost;
-      current.faturamentoBalcao += s.totalValue;
-      current.lucroBalcao += s.estimatedProfit;
-      current.gessoBalcaoTon += tons;
-      current.gessoSaidaTon += tons;
-    }
-  }
-
-  for (const t of truckDeliveries) {
-    const d = new Date(t.date || t.createdAt);
-    const key = `${monthNames[d.getMonth()]}/${d.getFullYear().toString().slice(2)}`;
-    if (monthlyMap.has(key)) {
-      const current = monthlyMap.get(key)!;
-      current.gessoEntradaTon += Number(t.tonsGessoPo) || 0;
-    }
-  }
-
-  const monthlyFinancials = Array.from(monthlyMap.values());
+  const monthlyFinancials = buildMonthlyFinancials(chartQuotes, chartSales, truckDeliveries);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -246,7 +190,7 @@ export default async function AdminDashboardPage() {
               <p className="text-2xl sm:text-3xl font-black text-brand-red">
                 {counterSalesRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
               </p>
-              <p className="text-xs text-neutral-500 mt-1 font-medium">{recentSales.length} retiradas avulsas</p>
+              <p className="text-xs text-neutral-500 mt-1 font-medium">{counterSalesCount} retiradas avulsas</p>
             </div>
           </div>
         </section>
@@ -272,7 +216,7 @@ export default async function AdminDashboardPage() {
                 </div>
                 <div>
                   <h4 className="font-bold text-sm text-brand-charcoal-dark">Histórico do Balcão</h4>
-                  <p className="text-[11px] text-neutral-500">{recentSales.length} saídas avulsas</p>
+                  <p className="text-[11px] text-neutral-500">{counterSalesCount} saídas avulsas</p>
                 </div>
               </div>
               <ArrowUpRight className="w-4 h-4 text-brand-red transition-colors" />
