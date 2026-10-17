@@ -1,7 +1,7 @@
 // src/app/admin/page.tsx
 import Link from 'next/link';
 import Image from 'next/image';
-import { prisma } from '../../lib/prisma';
+import { prisma, toNumber } from '../../lib/prisma';
 import { requireAdminPage } from '../../lib/auth';
 import { logoutAdmin } from '../actions/authActions';
 import ChartsWrapper from './ChartsWrapper';
@@ -56,7 +56,7 @@ export default async function AdminDashboardPage() {
   const totalQuotesValue = quotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
   const approvedQuotes = quotes.filter((q) => isApproved(q.status));
   const approvedRevenue = approvedQuotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
-  const counterSalesRevenue = salesTotals._sum.totalValue ?? 0;
+  const counterSalesRevenue = toNumber(salesTotals._sum.totalValue);
   const counterSalesCount = salesTotals._count;
 
   const gessoItem = stockBalances.find((s) => s.itemKey === 'gessoPoKg');
