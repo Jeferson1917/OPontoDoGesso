@@ -3,6 +3,8 @@
 import { prisma, toNumber } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, unauthorized } from '../../lib/auth';
+import { z } from 'zod';
+import { counterSaleSchema, parseInput, truckDeliverySchema } from '../data/schemas';
 import { Prisma } from '@prisma/client';
 import { splitTruckCosts, weightedAverageCost } from '../utils/truckCost';
 
@@ -48,17 +50,12 @@ export async function getStockDataAction() {
   }
 }
 
-export async function registerTruckDeliveryAction(data: {
-  supplier: string;
-  tonsGessoPo: number;
-  platesQuantity: number;
-  gessoCostTotal: number;
-  platesCostTotal?: number;
-  freightCost: number;
-  unloadingLaborCost: number;
-  notes?: string;
-}) {
+export async function registerTruckDeliveryAction(input: z.input<typeof truckDeliverySchema>) {
   if (!(await getAdminSession())) return unauthorized();
+
+  const parsed = parseInput(truckDeliverySchema, input);
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  const data = parsed.data;
 
   try {
     const totalKg = data.tonsGessoPo * 1000;
@@ -113,13 +110,12 @@ export async function registerTruckDeliveryAction(data: {
   }
 }
 
-export async function registerCounterSaleAction(data: {
-  customerName?: string;
-  itemKey: string;
-  quantity: number;
-  unitPrice: number;
-}) {
+export async function registerCounterSaleAction(input: z.input<typeof counterSaleSchema>) {
   if (!(await getAdminSession())) return unauthorized();
+
+  const parsed = parseInput(counterSaleSchema, input);
+  if (!parsed.ok) return { success: false, error: parsed.error };
+  const data = parsed.data;
 
   try {
     const totalValue = data.quantity * data.unitPrice;
