@@ -7,6 +7,7 @@ import {
   registerTruckDeliveryAction, 
   registerCounterSaleAction 
 } from '../../actions/stockActions';
+import { splitTruckCosts } from '../../utils/truckCost';
 import { toast } from 'sonner';
 import { 
   Truck, 
@@ -31,6 +32,7 @@ export default function AdminStockPage() {
     tonsGessoPo: 10,
     platesQuantity: 0,
     gessoCostTotal: 5500,
+    platesCostTotal: 0,
     freightCost: 2200,
     unloadingLaborCost: 400,
     notes: '',
@@ -58,6 +60,8 @@ export default function AdminStockPage() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const truckSplit = splitTruckCosts(truckForm);
 
   const handleRegisterTruck = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,7 +267,7 @@ export default function AdminStockPage() {
                               R$ {(del.realCostPerKg * 20).toFixed(2)}
                             </td>
                             <td className="py-3 text-right font-black text-brand-red">
-                              {(del.gessoCostTotal + del.freightCost + del.unloadingLaborCost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                              {(del.gessoCostTotal + (del.platesCostTotal ?? 0) + del.freightCost + del.unloadingLaborCost).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                             </td>
                           </tr>
                         ))}
@@ -323,16 +327,28 @@ export default function AdminStockPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-200">
                 <div>
-                  <label htmlFor="truck-mat-cost" className="block text-xs font-bold text-neutral-700 mb-1">Material na Fábrica (R$)</label>
+                  <label htmlFor="truck-mat-cost" className="block text-xs font-bold text-neutral-700 mb-1">Nota do Gesso em Pó (R$)</label>
                   <input 
                     id="truck-mat-cost"
                     type="number" 
                     required 
                     value={truckForm.gessoCostTotal} 
-                    onChange={(e) => setTruckForm({ ...truckForm, gessoCostTotal: Number(e.target.value) })} 
-                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-sm bg-white" 
+                    onChange={(e) => setTruckForm({ ...truckForm, gessoCostTotal: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-sm bg-white"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="truck-plates-cost" className="block text-xs font-bold text-neutral-700 mb-1">Nota das Placas (R$)</label>
+                  <input
+                    id="truck-plates-cost"
+                    type="number"
+                    min="0"
+                    disabled={!(truckForm.platesQuantity > 0)}
+                    value={truckForm.platesCostTotal}
+                    onChange={(e) => setTruckForm({ ...truckForm, platesCostTotal: Number(e.target.value) })}
+                    className="w-full px-3 py-2 rounded-xl border border-neutral-300 text-sm bg-white disabled:bg-neutral-100 disabled:text-neutral-400"
                   />
                 </div>
                 <div>
@@ -363,17 +379,24 @@ export default function AdminStockPage() {
                 <div>
                   <p className="text-xs text-neutral-400">Investimento Total na Carga:</p>
                   <p className="text-xl font-black text-brand-red-light">
-                    {(Number(truckForm.gessoCostTotal) + Number(truckForm.freightCost) + Number(truckForm.unloadingLaborCost)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    {truckSplit.totalSpent.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                   </p>
                 </div>
 
                 <div className="text-right">
-                  <p className="text-xs text-neutral-400">Custo Real Rateado por Saco de 20kg:</p>
+                  <p className="text-xs text-neutral-400">Custo Real Rateado (com frete e descarga):</p>
                   <p className="text-lg font-bold text-emerald-400">
                     {truckForm.tonsGessoPo > 0
-                      ? `R$ ${(((Number(truckForm.gessoCostTotal) + Number(truckForm.freightCost) + Number(truckForm.unloadingLaborCost)) / (truckForm.tonsGessoPo * 1000)) * 20).toFixed(2)} / saco`
-                      : 'R$ 0,00'}
+                      ? `R$ ${(truckSplit.costPerKg * 20).toFixed(2)} / saco`
+                      : 'R$ 0,00 / saco'}
                   </p>
+                  {truckForm.platesQuantity > 0 && (
+                    <p className="text-xs font-bold text-emerald-300">
+                      {truckSplit.costPerPlate > 0
+                        ? `R$ ${truckSplit.costPerPlate.toFixed(2)} / placa`
+                        : 'Placas sem nota: custo médio das placas não muda'}
+                    </p>
+                  )}
                 </div>
               </div>
 

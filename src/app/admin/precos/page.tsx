@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { defaultPricingConfig } from '../../data/pricingConfig';
-import { resetPricingConfigAction, savePricingConfigAction } from '../../actions/pricingActions';
+import { getStockCostsAction, resetPricingConfigAction, savePricingConfigAction } from '../../actions/pricingActions';
 import { loadPricingConfig } from '../../utils/pricingClient';
 import {
   ArrowLeft,
@@ -18,9 +18,12 @@ import {
   Layers
 } from 'lucide-react';
 
+type MaterialKey = keyof typeof defaultPricingConfig.materialCosts;
+
 export default function AdminPricingPage() {
   const [config, setConfig] = useState(defaultPricingConfig);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [stockCosts, setStockCosts] = useState<Partial<Record<MaterialKey, number>>>({});
 
   // Carrega a tabela de preços do banco (compartilhada entre todos os dispositivos)
   useEffect(() => {
@@ -29,7 +32,15 @@ export default function AdminPricingPage() {
       setIsLoaded(true);
       if (error) toast.error(error);
     });
+    getStockCostsAction().then((res) => {
+      if (res.success) setStockCosts(res.stockCosts);
+    });
   }, []);
+
+  const applyAllStockCosts = () => {
+    setConfig((prev) => ({ ...prev, materialCosts: { ...prev.materialCosts, ...stockCosts } }));
+    toast.info('Custos do estoque aplicados. Clique em Salvar Alterações para confirmar.');
+  };
 
   const handleLaborChange = (key: keyof typeof defaultPricingConfig.laborRates, value: number) => {
     setConfig((prev) => ({
@@ -191,8 +202,21 @@ export default function AdminPricingPage() {
                   Custo dos Insumos
                 </h2>
               </div>
-              <span className="text-[11px] font-semibold text-neutral-400">Preço de Compra</span>
+              {Object.keys(stockCosts).length > 0 ? (
+                <button
+                  type="button"
+                  onClick={applyAllStockCosts}
+                  className="text-[11px] font-bold text-emerald-700 hover:underline"
+                >
+                  Usar custos do estoque
+                </button>
+              ) : (
+                <span className="text-[11px] font-semibold text-neutral-400">Preço de Compra</span>
+              )}
             </div>
+            <p className="text-[11px] text-neutral-500 -mt-2">
+              O custo médio do estoque é atualizado a cada carga de caminhão (nota + frete + descarga). Ele não substitui sozinho o valor usado nos orçamentos.
+            </p>
 
             <div className="space-y-3.5">
               {[
@@ -207,12 +231,26 @@ export default function AdminPricingPage() {
                   <div>
                     <label className="block text-xs font-bold text-neutral-700">{item.label}</label>
                     <span className="text-[10px] text-neutral-400">{item.unit}</span>
+                    {stockCosts[item.key as MaterialKey] !== undefined && (
+                      <span className="block text-[10px] text-emerald-700">
+                        Custo médio no estoque: R$ {stockCosts[item.key as MaterialKey]!.toFixed(2)}{' '}
+                        {stockCosts[item.key as MaterialKey] !== config.materialCosts[item.key as MaterialKey] && (
+                          <button
+                            type="button"
+                            onClick={() => handleMaterialChange(item.key as MaterialKey, stockCosts[item.key as MaterialKey]!)}
+                            className="font-bold hover:underline"
+                          >
+                            · usar
+                          </button>
+                        )}
+                      </span>
+                    )}
                   </div>
                   <div className="relative w-32 flex-shrink-0">
                     <span className="absolute left-3 top-2 text-[11px] font-bold text-neutral-400">R$</span>
                     <input
                       type="number"
-                      step="0.1"
+                      step="0.01"
                       min="0"
                       value={config.materialCosts[item.key as keyof typeof defaultPricingConfig.materialCosts]}
                       onChange={(e) => handleMaterialChange(item.key as keyof typeof defaultPricingConfig.materialCosts, Number(e.target.value))}
