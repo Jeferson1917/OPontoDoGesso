@@ -54,7 +54,10 @@ export default async function AdminDashboardPage() {
     prisma.truckDelivery.findMany({ where: { date: { gte: since } }, select: { date: true, tonsGessoPo: true } }),
   ]);
 
-  const totalQuotesValue = quotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
+  // Propostas em aberto ou fechadas; canceladas não entram no valor
+  const activeQuotes = quotes.filter((q) => q.status !== 'CANCELADO');
+  const totalQuotesValue = activeQuotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
+  const cancelledCount = quotes.length - activeQuotes.length;
   const approvedQuotes = quotes.filter((q) => isApproved(q.status));
   const approvedRevenue = approvedQuotes.reduce((acc, q) => acc + getEffectivePrice(q), 0);
   const counterSalesRevenue = salesTotals._sum.totalValue ?? 0;
@@ -66,6 +69,7 @@ export default async function AdminDashboardPage() {
   const tonsGesso = gessoItem ? (gessoItem.currentQuantity / 1000).toFixed(1) : '0';
   const totalPlacas = placaItem ? placaItem.currentQuantity : 0;
   const isGessoLow = gessoItem ? gessoItem.currentQuantity <= gessoItem.minThreshold : false;
+  const lowStockItems = stockBalances.filter((s) => s.currentQuantity <= s.minThreshold);
 
   const monthlyFinancials = buildMonthlyFinancials(chartQuotes, chartSales, truckDeliveries);
 
@@ -137,6 +141,24 @@ export default async function AdminDashboardPage() {
           </div>
         </header>
 
+        {/* ALERTA DE ESTOQUE BAIXO (todos os itens) */}
+        {lowStockItems.length > 0 && (
+          <Link
+            href="/admin/estoque"
+            className="flex items-start gap-3 bg-amber-50 border border-amber-300 text-amber-900 p-4 rounded-2xl hover:bg-amber-100/70 transition-colors"
+          >
+            <AlertTriangle className="w-5 h-5 shrink-0 text-amber-600 mt-0.5" />
+            <div className="text-sm">
+              <p className="font-bold">Estoque abaixo do ponto de reposição</p>
+              <p className="text-xs mt-0.5">
+                {lowStockItems
+                  .map((item) => `${item.name}: ${item.currentQuantity.toLocaleString('pt-BR')} ${item.unit} (mínimo ${item.minThreshold.toLocaleString('pt-BR')})`)
+                  .join(' · ')}
+              </p>
+            </div>
+          </Link>
+        )}
+
         {/* 4 CARDS DE KPIS */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-white p-6 rounded-2xl border border-neutral-200/80 shadow-sm space-y-3 relative overflow-hidden">
@@ -159,9 +181,12 @@ export default async function AdminDashboardPage() {
             </div>
             <div>
               <p className="text-2xl sm:text-3xl font-black text-brand-charcoal-dark">
-                {quotes.length}
+                {activeQuotes.length}
               </p>
-              <p className="text-xs text-neutral-500 mt-1 font-medium">Total: {totalQuotesValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</p>
+              <p className="text-xs text-neutral-500 mt-1 font-medium">
+                Total: {totalQuotesValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
+                {cancelledCount > 0 && ` · ${cancelledCount} cancelada${cancelledCount > 1 ? 's' : ''} fora da conta`}
+              </p>
             </div>
           </div>
 
