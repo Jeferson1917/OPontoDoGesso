@@ -2,11 +2,7 @@
 
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { SignJWT, jwtVerify } from 'jose';
-
-const SECRET_KEY = new TextEncoder().encode(
-  process.env.AUTH_SECRET || 'chave_padrao_temporaria_32_caracteres_min'
-);
+import { SESSION_COOKIE, SESSION_MAX_AGE_SECONDS, createSessionToken } from '../../lib/session';
 
 export async function loginAdmin(formData: FormData) {
   const email = formData.get('email') as string;
@@ -20,19 +16,16 @@ export async function loginAdmin(formData: FormData) {
   }
 
   // Gera o token JWT com validade de 7 dias
-  const token = await new SignJWT({ role: 'ADMIN', email })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('7d')
-    .sign(SECRET_KEY);
+  const token = await createSessionToken(email);
 
   // Salva no cookie httpOnly seguro
   const cookieStore = await cookies();
-  cookieStore.set('admin_session', token, {
+  cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     path: '/',
-    maxAge: 60 * 60 * 24 * 7, // 7 dias
+    maxAge: SESSION_MAX_AGE_SECONDS,
   });
 
   return { success: true };
@@ -40,6 +33,6 @@ export async function loginAdmin(formData: FormData) {
 
 export async function logoutAdmin() {
   const cookieStore = await cookies();
-  cookieStore.delete('admin_session');
+  cookieStore.delete(SESSION_COOKIE);
   redirect('/admin/login');
 }

@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { prisma } from '../../lib/prisma';
+import { requireAdminPage } from '../../lib/auth';
 import { logoutAdmin } from '../actions/authActions';
 import ChartsWrapper from './ChartsWrapper';
 import { MonthlyData } from './DashboardCharts';
@@ -25,6 +26,8 @@ import {
 export const dynamic = 'force-dynamic';
 
 export default async function AdminDashboardPage() {
+  await requireAdminPage();
+
   const [quotes, stockBalances, recentSales, truckDeliveries] = await Promise.all([
     prisma.quote.findMany({ orderBy: { createdAt: 'desc' } }),
     prisma.stockBalance.findMany(),

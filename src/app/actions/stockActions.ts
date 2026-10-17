@@ -2,6 +2,7 @@
 
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
+import { getAdminSession, unauthorized } from '../../lib/auth';
 
 const defaultStockItems = [
   { itemKey: 'gessoPoKg', name: 'Gesso em Pó Tradicional', unit: 'kg', currentQuantity: 8000, minThreshold: 2500, averageUnitCost: 0.65, counterSalePrice: 1.10 },
@@ -12,6 +13,8 @@ const defaultStockItems = [
 ];
 
 export async function getStockDataAction() {
+  if (!(await getAdminSession())) return unauthorized();
+
   try {
     let balances = await prisma.stockBalance.findMany();
 
@@ -42,6 +45,8 @@ export async function registerTruckDeliveryAction(data: {
   unloadingLaborCost: number;
   notes?: string;
 }) {
+  if (!(await getAdminSession())) return unauthorized();
+
   try {
     const totalKg = data.tonsGessoPo * 1000;
     const totalSpent = data.gessoCostTotal + data.freightCost + data.unloadingLaborCost;
@@ -97,6 +102,8 @@ export async function registerCounterSaleAction(data: {
   quantity: number;
   unitPrice: number;
 }) {
+  if (!(await getAdminSession())) return unauthorized();
+
   try {
     const totalValue = data.quantity * data.unitPrice;
 

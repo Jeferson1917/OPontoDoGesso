@@ -1,11 +1,14 @@
 // src/app/admin/balcao/page.tsx
 import Link from 'next/link';
 import { prisma } from '../../../lib/prisma';
+import { requireAdminPage } from '../../../lib/auth';
 import { ArrowLeft, ShoppingBag, Search, DollarSign, Calendar, TrendingUp, Package } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
 export default async function AdminCounterSalesHistoryPage() {
+  await requireAdminPage();
+
   const sales = await prisma.counterSale.findMany({
     orderBy: { createdAt: 'desc' },
   });
