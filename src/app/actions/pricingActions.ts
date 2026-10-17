@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '../../lib/prisma';
 import { getAdminSession, unauthorized } from '../../lib/auth';
-import { sanitizePricingConfig, type PricingConfig } from '../data/pricingConfig';
+import { STOCK_COST_SOURCES, sanitizePricingConfig, type PricingConfig } from '../data/pricingConfig';
 
 const CONFIG_ID = 'global_config';
 
@@ -50,5 +50,25 @@ export async function resetPricingConfigAction() {
   } catch (error) {
     console.error('Erro ao restaurar tabela de preços:', error);
     return { success: false as const, error: 'Falha ao restaurar a tabela de preços.' };
+  }
+}
+
+// Custo médio real de cada material que existe no estoque, já na unidade do orçamento
+export async function getStockCostsAction() {
+  if (!(await getAdminSession())) return unauthorized();
+
+  try {
+    const balances = await prisma.stockBalance.findMany({ select: { itemKey: true, averageUnitCost: true } });
+    const stockCosts: Partial<Record<keyof PricingConfig['materialCosts'], number>> = {};
+    for (const [materialKey, source] of Object.entries(STOCK_COST_SOURCES)) {
+      const balance = balances.find((b) => b.itemKey === source.itemKey);
+      if (balance && balance.averageUnitCost > 0) {
+        stockCosts[materialKey as keyof PricingConfig['materialCosts']] = Number((balance.averageUnitCost * source.factor).toFixed(2));
+      }
+    }
+    return { success: true as const, stockCosts };
+  } catch (error) {
+    console.error('Erro ao carregar custos do estoque:', error);
+    return { success: false as const, error: 'Falha ao carregar custos do estoque.' };
   }
 }

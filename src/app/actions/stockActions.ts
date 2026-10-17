@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, unauthorized } from '../../lib/auth';
 import { Prisma } from '@prisma/client';
+import { splitTruckCosts, weightedAverageCost } from '../utils/truckCost';
 
 // Neon tem latência alta; o timeout padrão de 5s das transações é curto
 const STOCK_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
@@ -52,6 +53,7 @@ export async function registerTruckDeliveryAction(data: {
   tonsGessoPo: number;
   platesQuantity: number;
   gessoCostTotal: number;
+  platesCostTotal?: number;
   freightCost: number;
   unloadingLaborCost: number;
   notes?: string;
@@ -60,8 +62,8 @@ export async function registerTruckDeliveryAction(data: {
 
   try {
     const totalKg = data.tonsGessoPo * 1000;
-    const totalSpent = data.gessoCostTotal + data.freightCost + data.unloadingLaborCost;
-    const realCostPerKg = totalKg > 0 ? Number((totalSpent / totalKg).toFixed(3)) : 0.65;
+    const split = splitTruckCosts({ ...data, platesCostTotal: data.platesCostTotal ?? 0 });
+    const realCostPerKg = Number(split.costPerKg.toFixed(3));
 
     await prisma.$transaction(async (tx) => {
       // 1. Grava registro da entrega
@@ -71,6 +73,7 @@ export async function registerTruckDeliveryAction(data: {
           tonsGessoPo: data.tonsGessoPo,
           platesQuantity: data.platesQuantity,
           gessoCostTotal: data.gessoCostTotal,
+          platesCostTotal: data.platesCostTotal ?? 0,
           freightCost: data.freightCost,
           unloadingLaborCost: data.unloadingLaborCost,
           realCostPerKg,
@@ -78,24 +81,24 @@ export async function registerTruckDeliveryAction(data: {
         },
       });
 
-      // 2. Atualiza saldo de gesso em pó e calcula novo custo médio.
+      // 2. Entrada no saldo + novo custo médio ponderado de cada item.
       // FOR UPDATE trava a linha: uma venda/baixa simultânea espera, em vez de ser sobrescrita pelo saldo lido aqui
-      const [gessoBalance] = await tx.$queryRaw<{ currentQuantity: number; averageUnitCost: number }[]>`
-        SELECT "currentQuantity", "averageUnitCost" FROM stock_balances WHERE "itemKey" = 'gessoPoKg' FOR UPDATE`;
-      if (gessoBalance) {
-        const newQty = gessoBalance.currentQuantity + totalKg;
-        const newAvgCost = Number((((gessoBalance.currentQuantity * gessoBalance.averageUnitCost) + totalSpent) / newQty).toFixed(3));
+      const entries = [
+        { itemKey: 'gessoPoKg', qty: totalKg, cost: split.gessoTotalCost },
+        { itemKey: 'placaGesso60x60', qty: data.platesQuantity, cost: split.platesTotalCost },
+      ];
+      for (const entry of entries) {
+        if (!(entry.qty > 0)) continue;
+        const [balance] = await tx.$queryRaw<{ currentQuantity: number; averageUnitCost: number }[]>`
+          SELECT "currentQuantity", "averageUnitCost" FROM stock_balances WHERE "itemKey" = ${entry.itemKey} FOR UPDATE`;
+        if (!balance) continue;
+        // Sem custo informado (ex.: placas sem nota), só soma a quantidade e mantém o custo médio
+        const newAvgCost = entry.cost > 0
+          ? weightedAverageCost(balance.currentQuantity, balance.averageUnitCost, entry.qty, entry.cost)
+          : balance.averageUnitCost;
         await tx.stockBalance.update({
-          where: { itemKey: 'gessoPoKg' },
-          data: { currentQuantity: newQty, averageUnitCost: newAvgCost },
-        });
-      }
-
-      // 3. Atualiza placas se vieram no caminhão
-      if (data.platesQuantity > 0) {
-        await tx.stockBalance.update({
-          where: { itemKey: 'placaGesso60x60' },
-          data: { currentQuantity: { increment: data.platesQuantity } },
+          where: { itemKey: entry.itemKey },
+          data: { currentQuantity: { increment: entry.qty }, averageUnitCost: Number(newAvgCost.toFixed(3)) },
         });
       }
     }, STOCK_TX_OPTIONS);

@@ -44,6 +44,7 @@ model TruckDelivery {
   tonsGessoPo        Float    // Toneladas de pó
   platesQuantity     Int      @default(0) // Placas 60x60
   gessoCostTotal     Float    // Custo na fábrica
+  platesCostTotal    Float    @default(0) // Nota das placas (frete/descarga são rateados pelo valor)
   freightCost        Float    // Frete pago ao caminhão
   unloadingLaborCost Float    // Chapa/descarga
   realCostPerKg      Float    // Custo rateado por kg

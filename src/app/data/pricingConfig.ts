@@ -59,3 +59,13 @@ export function sanitizePricingConfig(input: unknown): PricingConfig {
     profitMarginMultiplier: validNumber(source.profitMarginMultiplier, LOWER_BOUND.profitMarginMultiplier!, defaultPricingConfig.profitMarginMultiplier),
   };
 }
+
+// Materiais do orçamento que também existem no estoque: de onde vem o custo médio real
+// (factor converte a unidade do estoque para a do orçamento; ex.: kg → saco de 20kg)
+export const STOCK_COST_SOURCES: Partial<Record<keyof PricingConfig['materialCosts'], { itemKey: string; factor: number }>> = {
+  placaGesso60x60: { itemKey: 'placaGesso60x60', factor: 1 },
+  gessoPo20kg: { itemKey: 'gessoPoKg', factor: 20 },
+  gessoColaKg: { itemKey: 'gessoColaKg', factor: 1 },
+  arameGalvanizado18Kg: { itemKey: 'arameGalvanizadoKg', factor: 1 },
+  sisalJutaKg: { itemKey: 'sisalKg', factor: 1 },
+};
