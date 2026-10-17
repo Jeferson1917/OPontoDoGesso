@@ -5,6 +5,7 @@ import { requireAdminPage } from '../../../lib/auth';
 import { stockItemLabel } from '../../data/stockTypes';
 import { ArrowLeft, ShoppingBag, Package } from 'lucide-react';
 import { formatBusinessDate } from '../../utils/dates';
+import { DeleteSaleButton } from './DeleteSaleButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,6 +105,7 @@ export default async function AdminCounterSalesHistoryPage() {
                   <th className="py-3 px-2">Preço Unitário</th>
                   <th className="py-3 px-2">Valor Total</th>
                   <th className="py-3 px-2 text-right">Lucro Estimado</th>
+                  <th className="py-3 px-2 w-10"><span className="sr-only">Ações</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
@@ -135,6 +137,12 @@ export default async function AdminCounterSalesHistoryPage() {
                     </td>
                     <td className="py-3.5 px-2 text-right font-black text-emerald-600">
                       +{sale.estimatedProfit.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </td>
+                    <td className="py-3.5 px-2 text-right">
+                      <DeleteSaleButton
+                        saleId={sale.id}
+                        description={`${sale.quantity} × ${stockItemLabel(sale.itemKey)} — ${sale.customerName || 'Cliente Balcão'}`}
+                      />
                     </td>
                   </tr>
                 ))}

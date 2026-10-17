@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   getQuotesAction,
   updateQuoteStatusAction,
+  deleteQuoteAction,
 } from "../../actions/quoteActions";
 import { generateQuotePDF } from "../../utils/pdfGenerator";
 import type { RoomInput } from "../../data/calculatorTypes";
@@ -17,6 +18,7 @@ import {
   Clock,
   PlayCircle,
   XCircle,
+  Trash2,
 } from "lucide-react";
 import { QuoteStatus } from "@prisma/client";
 import { formatBusinessDate } from "../../utils/dates";
@@ -52,19 +54,31 @@ export default function AdminQuotesHistoryPage() {
     const res = await updateQuoteStatusAction(id, newStatus);
 
     if (res.success) {
+      const label = QUOTE_STATUS_LABELS[newStatus];
       if (res.deducted) {
-        toast.success(`Status alterado para ${newStatus} e materiais baixados do estoque!`, { id: toastId });
+        toast.success(`Status alterado para ${label} e materiais baixados do estoque!`, { id: toastId });
       } else if (res.refunded) {
-        toast.success(`Obra cancelada. Materiais devolvidos ao estoque com sucesso!`, { id: toastId });
+        toast.success(`Status alterado para ${label}. Materiais devolvidos ao estoque.`, { id: toastId });
       } else {
-        toast.success(`Status atualizado para ${newStatus}!`, { id: toastId });
+        toast.success(`Status atualizado para ${label}!`, { id: toastId });
       }
 
-      setQuotes((prev) =>
-        prev.map((q) => (q.id === id ? { ...q, status: newStatus } : q))
-      );
+      // Recarrega para refletir também a baixa/devolução de estoque
+      fetchQuotes();
     } else {
       toast.error(res.error || 'Falha ao atualizar status.', { id: toastId });
+    }
+  };
+
+  const handleDeleteQuote = async (id: string, clientName: string) => {
+    if (!confirm(`Excluir o orçamento de ${clientName}? Essa ação não pode ser desfeita.`)) return;
+    const toastId = toast.loading('Excluindo orçamento...');
+    const res = await deleteQuoteAction(id);
+    if (res.success) {
+      toast.success('Orçamento excluído.', { id: toastId });
+      setQuotes((prev) => prev.filter((q) => q.id !== id));
+    } else {
+      toast.error(res.error, { id: toastId });
     }
   };
 
@@ -235,6 +249,17 @@ export default function AdminQuotesHistoryPage() {
                           >
                             <FileText className="w-3.5 h-3.5" /> PDF
                           </button>
+                          {!quote.stockDeducted && (quote.status === "PENDENTE" || quote.status === "CANCELADO") && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteQuote(quote.id, quote.clientName)}
+                              className="ml-1 p-1.5 rounded-lg text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors align-middle"
+                              aria-label={`Excluir orçamento de ${quote.clientName}`}
+                              title="Excluir orçamento"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );

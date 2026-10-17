@@ -103,3 +103,9 @@ export function parseInput<T extends z.ZodType>(schema: T, data: unknown):
   const field = issue.path.length ? ` (${issue.path.join('.')})` : '';
   return { ok: false, error: `Dados inválidos${field}: ${issue.message}` };
 }
+
+export const stockAdjustmentSchema = z.object({
+  itemKey: stockItemKeySchema,
+  countedQuantity: z.number().finite().min(0, 'A quantidade contada não pode ser negativa.').max(10_000_000),
+  reason: z.string().trim().min(3, 'Informe o motivo do ajuste.').max(300),
+});

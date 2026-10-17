@@ -165,3 +165,26 @@ export async function updateQuoteStatusAction(id: string, status: QuoteStatus) {
     return { success: false as const, error: 'Falha ao atualizar status e movimentar estoque.' };
   }
 }
+
+// Só orçamentos que não movimentaram estoque: pendentes ou cancelados (já devolvidos)
+export async function deleteQuoteAction(id: string) {
+  if (!(await getAdminSession())) return unauthorized();
+  const parsedId = parseInput(idSchema, id);
+  if (!parsedId.ok) return { success: false as const, error: 'Orçamento inválido.' };
+
+  try {
+    const { count } = await prisma.quote.deleteMany({
+      where: { id: parsedId.data, stockDeducted: false, status: { in: ['PENDENTE', 'CANCELADO'] } },
+    });
+    if (count === 0) {
+      return { success: false as const, error: 'Só é possível excluir orçamentos pendentes ou cancelados, sem material baixado do estoque.' };
+    }
+
+    revalidatePath('/admin');
+    revalidatePath('/admin/historico');
+    return { success: true as const };
+  } catch (error) {
+    console.error('Erro ao excluir orçamento:', error);
+    return { success: false as const, error: 'Falha ao excluir o orçamento.' };
+  }
+}
