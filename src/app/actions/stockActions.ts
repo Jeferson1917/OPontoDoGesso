@@ -1,6 +1,6 @@
 'use server';
 
-import { prisma } from '../../lib/prisma';
+import { prisma, toNumber } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, unauthorized } from '../../lib/auth';
 import { Prisma } from '@prisma/client';
@@ -89,13 +89,13 @@ export async function registerTruckDeliveryAction(data: {
       ];
       for (const entry of entries) {
         if (!(entry.qty > 0)) continue;
-        const [balance] = await tx.$queryRaw<{ currentQuantity: number; averageUnitCost: number }[]>`
+        const [balance] = await tx.$queryRaw<{ currentQuantity: number; averageUnitCost: Prisma.Decimal }[]>`
           SELECT "currentQuantity", "averageUnitCost" FROM stock_balances WHERE "itemKey" = ${entry.itemKey} FOR UPDATE`;
         if (!balance) continue;
         // Sem custo informado (ex.: placas sem nota), só soma a quantidade e mantém o custo médio
         const newAvgCost = entry.cost > 0
-          ? weightedAverageCost(balance.currentQuantity, balance.averageUnitCost, entry.qty, entry.cost)
-          : balance.averageUnitCost;
+          ? weightedAverageCost(balance.currentQuantity, toNumber(balance.averageUnitCost), entry.qty, entry.cost)
+          : toNumber(balance.averageUnitCost);
         await tx.stockBalance.update({
           where: { itemKey: entry.itemKey },
           data: { currentQuantity: { increment: entry.qty }, averageUnitCost: Number(newAvgCost.toFixed(3)) },

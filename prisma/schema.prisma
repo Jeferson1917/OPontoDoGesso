@@ -13,9 +13,9 @@ model Quote {
   clientName          String
   clientPhone         String?
   totalAreaM2         Float
-  suggestedFinalPrice Float        // Valor paramétrico de tabela
-  finalAgreedPrice    Float        @default(0.0) 
-  discountApplied     Float        @default(0.0)
+  suggestedFinalPrice Decimal  @db.Decimal(12, 2)        // Valor paramétrico de tabela
+  finalAgreedPrice    Decimal  @db.Decimal(12, 2) @default(0) 
+  discountApplied     Decimal  @db.Decimal(12, 2) @default(0)
   stockDeducted       Boolean      @default(false)
   stockMovement       Json?        // Quantidades baixadas do estoque por itemKey (usado no estorno)
   approvedAt          DateTime?    // Quando a obra foi aprovada (receita entra neste mês no dashboard)
@@ -44,11 +44,11 @@ model TruckDelivery {
   supplier           String   // Ex: Polo do Araripe / Gipsita
   tonsGessoPo        Float    // Toneladas de pó
   platesQuantity     Int      @default(0) // Placas 60x60
-  gessoCostTotal     Float    // Custo na fábrica
-  platesCostTotal    Float    @default(0) // Nota das placas (frete/descarga são rateados pelo valor)
-  freightCost        Float    // Frete pago ao caminhão
-  unloadingLaborCost Float    // Chapa/descarga
-  realCostPerKg      Float    // Custo rateado por kg
+  gessoCostTotal     Decimal  @db.Decimal(12, 2)    // Custo na fábrica
+  platesCostTotal    Decimal  @db.Decimal(12, 2) @default(0) // Nota das placas (frete/descarga são rateados pelo valor)
+  freightCost        Decimal  @db.Decimal(12, 2)    // Frete pago ao caminhão
+  unloadingLaborCost Decimal  @db.Decimal(12, 2)    // Chapa/descarga
+  realCostPerKg      Decimal  @db.Decimal(12, 4)    // Custo rateado por kg
   notes              String?
   createdAt          DateTime @default(now())
 
@@ -61,9 +61,9 @@ model CounterSale {
   customerName    String?  // Nome do gesseiro ou cliente
   itemKey         String   // gessoPoKg, placaGesso60x60, etc.
   quantity        Float    // Quantidade vendida
-  unitPrice       Float    // Preço cobrado
-  totalValue      Float    // Total da venda
-  estimatedProfit Float    // Lucro líquido em cima do custo médio
+  unitPrice       Decimal  @db.Decimal(12, 4)    // Preço cobrado
+  totalValue      Decimal  @db.Decimal(12, 2)    // Total da venda
+  estimatedProfit Decimal  @db.Decimal(12, 2)    // Lucro líquido em cima do custo médio
   createdAt       DateTime @default(now())
 
   @@map("counter_sales")
@@ -74,7 +74,7 @@ model PricingConfig {
   id                     String   @id @default("global_config")
   laborRates             Json     // Tabela de preços de mão de obra
   materialCosts          Json     // Custo unitário de compra dos insumos
-  minimumProjectPrice    Float    @default(350.0)
+  minimumProjectPrice    Decimal  @db.Decimal(12, 2) @default(350)
   profitMarginMultiplier Float    @default(1.35)
   wasteFactor            Float    @default(1.10)
   updatedAt              DateTime @updatedAt
@@ -90,8 +90,8 @@ model StockBalance {
   unit             String
   currentQuantity  Float
   minThreshold     Float
-  averageUnitCost  Float
-  counterSalePrice Float
+  averageUnitCost  Decimal  @db.Decimal(12, 4)
+  counterSalePrice Decimal  @db.Decimal(12, 4)
   updatedAt        DateTime @updatedAt
 
   @@map("stock_balances")
