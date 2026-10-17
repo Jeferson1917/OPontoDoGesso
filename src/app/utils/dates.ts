@@ -28,3 +28,14 @@ export function businessMonthStart(year: number, month: number): Date {
 export function formatBusinessDate(date: Date | string, options: Intl.DateTimeFormatOptions = {}): string {
   return new Date(date).toLocaleDateString('pt-BR', { timeZone: BUSINESS_TIME_ZONE, ...options });
 }
+
+// "AAAA-MM-DD" de hoje no fuso do negócio (valor padrão de campos de data)
+export function businessTodayInput(now = new Date()): string {
+  const { year, month, day } = businessDateParts(now);
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+// Converte "AAAA-MM-DD" (campo de data) num instante ao meio-dia de Aracaju: o dia nunca escorrega para o anterior/seguinte
+export function businessDateFromInput(value: string): Date {
+  return new Date(`${value}T12:00:00${BUSINESS_UTC_OFFSET}`);
+}
