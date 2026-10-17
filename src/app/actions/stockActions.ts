@@ -3,6 +3,17 @@
 import { prisma } from '../../lib/prisma';
 import { revalidatePath } from 'next/cache';
 import { getAdminSession, unauthorized } from '../../lib/auth';
+import { Prisma } from '@prisma/client';
+
+// Neon tem latência alta; o timeout padrão de 5s das transações é curto
+const STOCK_TX_OPTIONS = { maxWait: 10_000, timeout: 20_000 };
+const CONFLICT_MESSAGE = 'Outra alteração de estoque estava em andamento. Tente novamente.';
+
+// Erro de regra de negócio da venda: a mensagem vai direto para a tela
+class SaleError extends Error {}
+
+const isTransactionConflict = (error: unknown) =>
+  error instanceof Prisma.PrismaClientKnownRequestError && (error.code === 'P2028' || error.code === 'P2034');
 
 const defaultStockItems = [
   { itemKey: 'gessoPoKg', name: 'Gesso em Pó Tradicional', unit: 'kg', currentQuantity: 8000, minThreshold: 2500, averageUnitCost: 0.65, counterSalePrice: 1.10 },
@@ -67,8 +78,10 @@ export async function registerTruckDeliveryAction(data: {
         },
       });
 
-      // 2. Atualiza saldo de gesso em pó e calcula novo custo médio
-      const gessoBalance = await tx.stockBalance.findUnique({ where: { itemKey: 'gessoPoKg' } });
+      // 2. Atualiza saldo de gesso em pó e calcula novo custo médio.
+      // FOR UPDATE trava a linha: uma venda/baixa simultânea espera, em vez de ser sobrescrita pelo saldo lido aqui
+      const [gessoBalance] = await tx.$queryRaw<{ currentQuantity: number; averageUnitCost: number }[]>`
+        SELECT "currentQuantity", "averageUnitCost" FROM stock_balances WHERE "itemKey" = 'gessoPoKg' FOR UPDATE`;
       if (gessoBalance) {
         const newQty = gessoBalance.currentQuantity + totalKg;
         const newAvgCost = Number((((gessoBalance.currentQuantity * gessoBalance.averageUnitCost) + totalSpent) / newQty).toFixed(3));
@@ -85,13 +98,14 @@ export async function registerTruckDeliveryAction(data: {
           data: { currentQuantity: { increment: data.platesQuantity } },
         });
       }
-    });
+    }, STOCK_TX_OPTIONS);
 
     revalidatePath('/admin');
     revalidatePath('/admin/estoque');
     return { success: true, realCostPerKg };
   } catch (error) {
     console.error('Erro ao registrar caminhão:', error);
+    if (isTransactionConflict(error)) return { success: false, error: CONFLICT_MESSAGE };
     return { success: false, error: 'Falha ao registrar carga.' };
   }
 }
@@ -108,9 +122,16 @@ export async function registerCounterSaleAction(data: {
     const totalValue = data.quantity * data.unitPrice;
 
     await prisma.$transaction(async (tx) => {
+      // Decremento condicional: atômico, duas vendas simultâneas não deixam o saldo negativo
+      const { count } = await tx.stockBalance.updateMany({
+        where: { itemKey: data.itemKey, currentQuantity: { gte: data.quantity } },
+        data: { currentQuantity: { decrement: data.quantity } },
+      });
+
       const item = await tx.stockBalance.findUnique({ where: { itemKey: data.itemKey } });
-      if (!item || item.currentQuantity < data.quantity) {
-        throw new Error('Estoque insuficiente para esta venda.');
+      if (!item) throw new SaleError('Item não cadastrado no estoque.');
+      if (count === 0) {
+        throw new SaleError(`Estoque insuficiente: ${item.name} tem ${item.currentQuantity.toLocaleString('pt-BR')} ${item.unit}.`);
       }
 
       const estimatedProfit = totalValue - (data.quantity * item.averageUnitCost);
@@ -125,18 +146,15 @@ export async function registerCounterSaleAction(data: {
           estimatedProfit,
         },
       });
-
-      await tx.stockBalance.update({
-        where: { itemKey: data.itemKey },
-        data: { currentQuantity: { decrement: data.quantity } },
-      });
-    });
+    }, STOCK_TX_OPTIONS);
 
     revalidatePath('/admin');
     revalidatePath('/admin/estoque');
     return { success: true };
-  } catch (error: any) {
+  } catch (error) {
+    if (error instanceof SaleError) return { success: false, error: error.message };
     console.error('Erro na venda:', error);
-    return { success: false, error: error.message || 'Falha ao concluir venda.' };
+    if (isTransactionConflict(error)) return { success: false, error: CONFLICT_MESSAGE };
+    return { success: false, error: 'Falha ao concluir venda.' };
   }
 }
